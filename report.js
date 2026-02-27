@@ -67,5 +67,4 @@ async function generateReport() {
 
 generateReport();
 
-DATABASE_URL="your_connection_string" \
-deno run --allow-env --allow-net report.js
+
