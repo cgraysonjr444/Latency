@@ -1,0 +1,7 @@
+{
+  "tasks": {
+    "monitor": "deno run --allow-net --allow-env systemLatency.js",
+    "server": "deno run --allow-net --allow-env server.js",
+    "report": "deno run --allow-net --allow-env report.js"
+  }
+}
