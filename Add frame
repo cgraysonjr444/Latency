@@ -1,0 +1,8 @@
+INSERT INTO frames (frame_id, commit_id, image_url, exif_data)
+SELECT 
+    id, 
+    'your-commit-uuid-here', 
+    file_path, 
+    jsonb_build_object('iso', iso, 'shutter', shutter_speed)
+FROM media_assets
+WHERE id = 'your-asset-uuid-here';
