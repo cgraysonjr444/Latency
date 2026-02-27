@@ -1,0 +1,11 @@
+-- Table for tracking system health over time
+CREATE TABLE system_metrics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    metric_type VARCHAR(50) NOT NULL, -- 'network_lag', 'router_ping', 'system_status'
+    value_ms INTEGER,
+    status_code INTEGER DEFAULT 200,
+    captured_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for fast dashboard queries (ordering by time)
+CREATE INDEX idx_metrics_captured_at ON system_metrics (captured_at DESC);
