@@ -1,0 +1,10 @@
+SELECT 
+    c.timestamp,
+    f.image_url,
+    f.film_stock_emulation,
+    g.album_title,
+    g.artist
+FROM commits c
+JOIN frames f ON c.commit_id = f.commit_id
+LEFT JOIN grooves g ON c.commit_id = g.commit_id
+WHERE c.commit_id = 'your-commit-uuid-here';
