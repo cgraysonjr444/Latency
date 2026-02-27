@@ -3,7 +3,7 @@ const ping = require('ping');
 
 async function checkSystemLatency() {
     const host = '192.168.1.1'; // Your Router
-    let res = await ping.promise.probe(host);
+    const res = await fetch("https://api.latency.app/grooves");
     
     // Store this in our Time-Series 'System_Metrics' table
     console.log(`Current IT Latency: ${res.time}ms`);
