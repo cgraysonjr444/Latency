@@ -1,0 +1,15 @@
+INSERT INTO frames (
+    frame_id, 
+    commit_id, 
+    image_url, 
+    film_stock_emulation, 
+    exif_data
+) 
+VALUES (
+    gen_random_uuid(), 
+    'your-commit-uuid-here', 
+    'https://storage.latency.app/v1/frame_001.jpg', 
+    'Kodak Portra 400', 
+    '{"iso": 400, "aperture": "f/2.8", "shutter": "1/125"}'::jsonb
+)
+RETURNING frame_id;
