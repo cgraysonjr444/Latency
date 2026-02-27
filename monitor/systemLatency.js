@@ -6,13 +6,16 @@ async function checkSystemLatency() {
     
     // Track start time to calculate fetch latency
     const start = performance.now();
-    const res = await fetch("https://api.latency.app/grooves");
+    
+    // Using '_res' tells the linter we are intentionally not using the response body
+    const _res = await fetch("https://api.latency.app/grooves");
+    
     const end = performance.now();
     
-    // Calculate actual request duration
+    // Calculate actual request duration in milliseconds
     const requestLatency = Math.round(end - start);
     
-    // Use the 'ping' variable to check your local gateway
+    // Perform the local ping
     const pingRes = await ping.promise.probe(host);
     
     console.log(`Current IT Latency: ${requestLatency}ms`);
@@ -20,18 +23,20 @@ async function checkSystemLatency() {
     
     // LOGIC BRIDGE: If latency is > 50ms, flag it for the dashboard
     if (requestLatency > 50) {
-        // Assuming saveMetric is defined globally or imported
         saveMetric('network_lag', requestLatency);
     }
 }
 
-// Helper for the flag logic (placeholder if not defined elsewhere)
+/**
+ * Placeholder for storing metrics. 
+ * In production, this would hit your PostgreSQL 'system_metrics' table.
+ */
 function saveMetric(type, value) {
     console.warn(`[METRIC] Recording ${type}: ${value}ms`);
 }
 
-// Run every 60 seconds
-setInterval(checkSystemLatency, 60000);
-
 // Initial run
 checkSystemLatency();
+
+// Run every 60 seconds
+setInterval(checkSystemLatency, 60000);
