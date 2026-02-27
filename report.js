@@ -27,7 +27,15 @@ async function generateReport() {
             AND captured_at > date_trunc('week', NOW())
         `;
 
-        // 3. QUERY: Lifetime Workout Stats
+        // 3. QUERY: High Energy Record (Highest BPM this week)
+        const [peakBpm] = await sql`
+            SELECT MAX(value_ms) as top_bpm
+            FROM system_metrics
+            WHERE metric_type = 'vinyl_bpm'
+            AND captured_at > date_trunc('week', NOW())
+        `;
+
+        // 4. QUERY: Lifetime Workout Stats
         const [workoutStats] = await sql`
             SELECT 
                 SUM(value_ms) / 60000 as total_minutes,
@@ -36,7 +44,7 @@ async function generateReport() {
             WHERE metric_type = 'vinyl_workout_time'
         `;
 
-        // 4. QUERY: Recently Spun Vinyls (from 'grooves' table)
+        // 5. QUERY: Recently Spun Vinyls (from your 'grooves' table)
         const musicPlayed = await sql`
             SELECT artist, album, bpm
             FROM grooves
@@ -44,7 +52,8 @@ async function generateReport() {
             LIMIT 5
         `;
 
-        // 5. MAINTENANCE: Delete latency noise older than 30 days
+        // 6. MAINTENANCE: Delete latency noise older than 30 days
+        // We protect anything starting with 'vinyl_' to keep your history permanent.
         const deleted = await sql`
             DELETE FROM system_metrics 
             WHERE captured_at < NOW() - INTERVAL '30 days'
@@ -71,6 +80,7 @@ async function generateReport() {
         console.log(`🎯 WEEKLY GOAL PROGRESS (Target: 5hrs)`);
         console.log(`   Done:      ${current} / ${goal} mins`);
         console.log(`   Remaining: ${remaining} mins ${remaining === 0 ? '🔥 GOAL MET!' : ''}`);
+        console.log(`   Peak BPM:  ${peakBpm?.top_bpm || 0} BPM`);
         console.log(`-----------------------------------------`);
 
         console.log(`💪 LIFETIME WORKOUTS`);
@@ -90,8 +100,10 @@ async function generateReport() {
     } catch (err) {
         console.error("❌ Failed to generate report:", err.message);
     } finally {
+        // Close connection cleanly
         await sql.end();
     }
 }
 
+// Execute the report
 generateReport();
