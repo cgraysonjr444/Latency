@@ -53,7 +53,7 @@ async function generateReport() {
 
         // --- DISPLAY RESULTS ---
 
-        if (deleted.count > 0) {
+        if (deleted && deleted.count > 0) {
             console.log(`🧹 Maintenance: Cleared ${deleted.count} old latency records.`);
             console.log(`-----------------------------------------`);
         }
@@ -74,5 +74,24 @@ async function generateReport() {
         console.log(`-----------------------------------------`);
 
         console.log(`💪 LIFETIME WORKOUTS`);
-        console.log(`   Total Time:  ${Math.round
+        console.log(`   Total Time:  ${Math.round(workoutStats?.total_minutes || 0)} mins`);
+        console.log(`   Avg Session: ${Math.round(workoutStats?.avg_session || 0)} mins`);
+        console.log(`-----------------------------------------`);
 
+        console.log(`💿 RECENTLY SPUN`);
+        if (musicPlayed && musicPlayed.length > 0) {
+            musicPlayed.forEach(row => {
+                console.log(`   • ${row.artist} - ${row.album} (${row.bpm} BPM)`);
+            });
+        } else {
+            console.log("   No vinyl records logged yet.");
+        }
+
+    } catch (err) {
+        console.error("❌ Failed to generate report:", err.message);
+    } finally {
+        await sql.end();
+    }
+}
+
+generateReport();
