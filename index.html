@@ -5,22 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Latency & Vinyl Dashboard</title>
     <style>
+        /* 1. THEME VARIABLES */
         :root { 
             --bg: #0f172a; 
             --card: rgba(30, 41, 59, 0.7); 
             --accent: #38bdf8; 
             --success: #4ade80;
             --text: #f1f5f9; 
+            --input-bg: rgba(15, 23, 42, 0.5);
         }
+
+        /* LIGHT MODE OVERRIDES */
+        body.light-mode {
+            --bg: #f1f5f9;
+            --card: rgba(255, 255, 255, 0.8);
+            --accent: #0ea5e9;
+            --text: #1e293b;
+            --input-bg: #ffffff;
+        }
+
         body { 
             background: var(--bg); 
             color: var(--text); 
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
             display: flex; 
             justify-content: center; 
             padding: 20px; 
             margin: 0;
+            transition: background 0.3s, color 0.3s;
         }
+
         .grid { 
             display: grid; 
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
@@ -28,63 +42,66 @@
             width: 100%; 
             max-width: 1000px; 
         }
-        h1 { 
-            grid-column: 1 / -1; 
-            text-align: center; 
-            color: var(--accent); 
-            letter-spacing: 2px;
+
+        /* Header & Toggle Area */
+        .header-area {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 10px;
         }
+        
+        h1 { margin: 0; color: var(--accent); letter-spacing: 2px; font-size: 1.5rem; }
+
+        #theme-toggle {
+            background: var(--card);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text);
+            padding: 8px 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
         .card { 
             background: var(--card); 
             backdrop-filter: blur(12px); 
             padding: 24px; 
             border-radius: 16px; 
             border: 1px solid rgba(255,255,255,0.1); 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
         }
+
         .stat { font-size: 2.5rem; font-weight: 800; margin: 5px 0; color: var(--accent); }
         .label { font-size: 0.8rem; opacity: 0.6; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; }
         
-        /* Form Styling */
         .form-group { display: flex; gap: 10px; margin-top: 15px; }
         input { 
-            flex: 1; 
-            padding: 12px; 
-            border-radius: 8px; 
-            border: 1px solid rgba(255,255,255,0.1); 
-            background: rgba(15, 23, 42, 0.5); 
-            color: white; 
-            outline: none;
+            flex: 1; padding: 12px; border-radius: 8px; 
+            border: 1px solid rgba(0,0,0,0.1); 
+            background: var(--input-bg); color: var(--text); outline: none;
         }
-        input:focus { border-color: var(--accent); }
-        button { 
-            background: var(--accent); 
-            color: var(--bg); 
-            border: none; 
-            padding: 12px 24px; 
-            border-radius: 8px; 
-            font-weight: bold; 
-            cursor: pointer;
-            transition: transform 0.2s, background 0.2s;
+        
+        button#save-btn { 
+            background: var(--accent); color: white; border: none; 
+            padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer;
         }
-        button:hover { background: var(--success); transform: translateY(-2px); }
-        button:active { transform: translateY(0); }
 
-        .vinyl-list { list-style: none; padding: 0; margin-top: 15px; }
         .vinyl-item { 
-            padding: 12px 0; 
-            border-bottom: 1px solid rgba(255,255,255,0.05); 
-            display: flex; 
-            justify-content: space-between;
+            padding: 12px 0; border-bottom: 1px solid rgba(128,128,128,0.1); 
+            display: flex; justify-content: space-between;
         }
-        .vinyl-item:last-child { border-bottom: none; }
-        .bpm-tag { color: var(--accent); font-weight: bold; font-size: 0.9rem; }
+        .bpm-tag { color: var(--accent); font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="grid">
-        <h1>SYSTEM & GROOVE PULSE</h1>
+        <div class="header-area">
+            <h1>SYSTEM & GROOVE</h1>
+            <button id="theme-toggle" onclick="toggleTheme()">🌓</button>
+        </div>
 
         <div class="card">
             <div class="label">Avg Latency (24h)</div>
@@ -95,87 +112,81 @@
         <div class="card">
             <div class="label">Weekly Workout</div>
             <div id="weekly-mins" class="stat">--</div>
-            <div id="goal-text" class="label">Goal: 300 / 500 mins</div>
+            <div class="label">Goal: 300 mins</div>
         </div>
 
         <div class="card">
             <div class="label">Peak Energy</div>
             <div id="peak-bpm" class="stat">--</div>
-            <div class="label">Max BPM recorded</div>
+            <div class="label">Max BPM</div>
         </div>
 
         <div class="card" style="grid-column: 1 / -1;">
             <div class="label">Log New Session</div>
             <div class="form-group">
-                <input type="number" id="input-bpm" placeholder="Heart Rate (BPM)">
-                <input type="number" id="input-mins" placeholder="Duration (Mins)">
-                <button onclick="logWorkout()">SAVE SESSION</button>
+                <input type="number" id="input-bpm" placeholder="BPM">
+                <input type="number" id="input-mins" placeholder="Mins">
+                <button id="save-btn" onclick="logWorkout()">SAVE</button>
             </div>
         </div>
 
         <div class="card" style="grid-column: 1 / -1;">
             <div class="label">Recently Spun</div>
-            <ul id="vinyl-list" class="vinyl-list">
-                </ul>
+            <ul id="vinyl-list" style="list-style: none; padding: 0;"></ul>
         </div>
     </div>
 
     <script>
+        // --- THEME LOGIC ---
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        }
+
+        // Load saved theme
+        if (localStorage.getItem('theme') === 'light') {
+            document.body.classList.add('light-mode');
+        }
+
+        // --- DATA LOGIC ---
         async function refreshStats() {
             try {
                 const res = await fetch('/api/stats');
                 const data = await res.json();
-                
-                document.getElementById('avg-lag').innerText = data.latency.avg_lag || 0;
-                document.getElementById('weekly-mins').innerText = data.workout.weekly_mins || 0;
-                document.getElementById('peak-bpm').innerText = data.workout.peak_bpm || 0;
+                document.getElementById('avg-lag').innerText = data.latency.avg_lag;
+                document.getElementById('weekly-mins').innerText = data.workout.weekly_mins;
+                document.getElementById('peak-bpm').innerText = data.workout.peak_bpm;
 
                 const list = document.getElementById('vinyl-list');
-                if (data.music && data.music.length > 0) {
-                    list.innerHTML = data.music.map(m => `
-                        <li class="vinyl-item">
-                            <span><strong>${m.artist}</strong> — ${m.album}</span>
-                            <span class="bpm-tag">${m.bpm} BPM</span>
-                        </li>
-                    `).join('');
-                } else {
-                    list.innerHTML = '<li class="vinyl-item">No records logged in the database yet.</li>';
-                }
-            } catch (err) {
-                console.error("Dashboard sync failed:", err);
-            }
+                list.innerHTML = data.music.map(m => `
+                    <li class="vinyl-item">
+                        <span><strong>${m.artist}</strong> — ${m.album}</span>
+                        <span class="bpm-tag">${m.bpm} BPM</span>
+                    </li>
+                `).join('');
+            } catch (e) { console.error("Sync error", e); }
         }
 
         async function logWorkout() {
-            const bpmInput = document.getElementById('input-bpm');
-            const minsInput = document.getElementById('input-mins');
-            
-            const bpm = parseInt(bpmInput.value);
-            const minutes = parseInt(minsInput.value);
-
-            if (!bpm || !minutes) return alert("Please enter both BPM and Duration!");
+            const bpm = document.getElementById('input-bpm').value;
+            const minutes = document.getElementById('input-mins').value;
+            if (!bpm || !minutes) return;
 
             const res = await fetch('/workout', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ bpm, minutes })
+                body: JSON.stringify({ bpm: parseInt(bpm), minutes: parseInt(minutes) })
             });
 
             if (res.ok) {
-                bpmInput.value = '';
-                minsInput.value = '';
-                // Flash the weekly-mins green to show success
-                document.getElementById('weekly-mins').style.color = 'var(--success)';
-                setTimeout(() => { document.getElementById('weekly-mins').style.color = 'var(--accent)'; }, 2000);
-                refreshStats(); 
-            } else {
-                alert("Failed to save workout. Check server console.");
+                document.getElementById('input-bpm').value = '';
+                document.getElementById('input-mins').value = '';
+                refreshStats();
             }
         }
 
-        // Initial load
         refreshStats();
-        // Auto-refresh every 30 seconds
         setInterval(refreshStats, 30000);
     </script>
 </body>
