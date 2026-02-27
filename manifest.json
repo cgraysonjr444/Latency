@@ -1,0 +1,15 @@
+{
+  "name": "Vinyl Latency Tracker",
+  "short_name": "GroovePulse",
+  "start_url": "/Latency/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#38bdf8",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3504/3504958.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
