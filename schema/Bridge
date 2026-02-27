@@ -1,0 +1,7 @@
+async function saveMetric(type, value) {
+    // This is where you'd use a Postgres driver like 'postgresjs' or 'deno-postgres'
+    console.warn(`[METRIC] Recording ${type}: ${value}ms`);
+    
+    // Example logic:
+    // await sql`INSERT INTO system_metrics (metric_type, value_ms) VALUES (${type}, ${value})`;
+}
