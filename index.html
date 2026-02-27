@@ -5,57 +5,178 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Latency & Vinyl Dashboard</title>
     <style>
-        :root { --bg: #0f172a; --card: rgba(30, 41, 59, 0.7); --accent: #38bdf8; --text: #f1f5f9; }
-        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; padding: 20px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; width: 100%; max-width: 1000px; }
-        .card { background: var(--card); backdrop-filter: blur(10px); padding: 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 30px rgba(0,0,0,0.5); }
-        h1 { grid-column: 1 / -1; text-align: center; color: var(--accent); }
-        .stat { font-size: 2rem; font-weight: bold; margin: 10px 0; color: var(--accent); }
-        .label { font-size: 0.9rem; opacity: 0.7; text-transform: uppercase; }
-        .vinyl-list { list-style: none; padding: 0; }
-        .vinyl-item { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        :root { 
+            --bg: #0f172a; 
+            --card: rgba(30, 41, 59, 0.7); 
+            --accent: #38bdf8; 
+            --success: #4ade80;
+            --text: #f1f5f9; 
+        }
+        body { 
+            background: var(--bg); 
+            color: var(--text); 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            padding: 20px; 
+            margin: 0;
+        }
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+            gap: 20px; 
+            width: 100%; 
+            max-width: 1000px; 
+        }
+        h1 { 
+            grid-column: 1 / -1; 
+            text-align: center; 
+            color: var(--accent); 
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+        .card { 
+            background: var(--card); 
+            backdrop-filter: blur(12px); 
+            padding: 24px; 
+            border-radius: 16px; 
+            border: 1px solid rgba(255,255,255,0.1); 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+        }
+        .stat { font-size: 2.5rem; font-weight: 800; margin: 5px 0; color: var(--accent); }
+        .label { font-size: 0.8rem; opacity: 0.6; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; }
+        
+        /* Form Styling */
+        .form-group { display: flex; gap: 10px; margin-top: 15px; }
+        input { 
+            flex: 1; 
+            padding: 12px; 
+            border-radius: 8px; 
+            border: 1px solid rgba(255,255,255,0.1); 
+            background: rgba(15, 23, 42, 0.5); 
+            color: white; 
+            outline: none;
+        }
+        input:focus { border-color: var(--accent); }
+        button { 
+            background: var(--accent); 
+            color: var(--bg); 
+            border: none; 
+            padding: 12px 24px; 
+            border-radius: 8px; 
+            font-weight: bold; 
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+        }
+        button:hover { background: var(--success); transform: translateY(-2px); }
+        button:active { transform: translateY(0); }
+
+        .vinyl-list { list-style: none; padding: 0; margin-top: 15px; }
+        .vinyl-item { 
+            padding: 12px 0; 
+            border-bottom: 1px solid rgba(255,255,255,0.05); 
+            display: flex; 
+            justify-content: space-between;
+        }
+        .vinyl-item:last-child { border-bottom: none; }
+        .bpm-tag { color: var(--accent); font-weight: bold; font-size: 0.9rem; }
     </style>
 </head>
 <body>
     <div class="grid">
-        <h1>System & Groove Pulse</h1>
+        <h1>SYSTEM & GROOVE PULSE</h1>
+
         <div class="card">
             <div class="label">Avg Latency (24h)</div>
             <div id="avg-lag" class="stat">--</div>
-            <div class="label">ms</div>
+            <div class="label">Milliseconds</div>
         </div>
+
         <div class="card">
             <div class="label">Weekly Workout</div>
             <div id="weekly-mins" class="stat">--</div>
-            <div id="goal-text" class="label">Goal: 300 mins</div>
+            <div id="goal-text" class="label">Goal: 300 / 500 mins</div>
         </div>
+
         <div class="card">
             <div class="label">Peak Energy</div>
             <div id="peak-bpm" class="stat">--</div>
-            <div class="label">Max BPM</div>
+            <div class="label">Max BPM recorded</div>
         </div>
+
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="label">Log New Session</div>
+            <div class="form-group">
+                <input type="number" id="input-bpm" placeholder="Heart Rate (BPM)">
+                <input type="number" id="input-mins" placeholder="Duration (Mins)">
+                <button onclick="logWorkout()">SAVE SESSION</button>
+            </div>
+        </div>
+
         <div class="card" style="grid-column: 1 / -1;">
             <div class="label">Recently Spun</div>
-            <ul id="vinyl-list" class="vinyl-list"></ul>
+            <ul id="vinyl-list" class="vinyl-list">
+                </ul>
         </div>
     </div>
 
     <script>
         async function refreshStats() {
-            const res = await fetch('/api/stats');
-            const data = await res.json();
-            
-            document.getElementById('avg-lag').innerText = Math.round(data.latency.avg_lag) || 0;
-            document.getElementById('weekly-mins').innerText = Math.round(data.workout.weekly_mins) || 0;
-            document.getElementById('peak-bpm').innerText = data.workout.peak_bpm || 0;
+            try {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                
+                document.getElementById('avg-lag').innerText = data.latency.avg_lag || 0;
+                document.getElementById('weekly-mins').innerText = data.workout.weekly_mins || 0;
+                document.getElementById('peak-bpm').innerText = data.workout.peak_bpm || 0;
 
-            const list = document.getElementById('vinyl-list');
-            list.innerHTML = data.music.map(m => `
-                <li class="vinyl-item"><strong>${m.artist}</strong> - ${m.album} (${m.bpm} BPM)</li>
-            `).join('');
+                const list = document.getElementById('vinyl-list');
+                if (data.music && data.music.length > 0) {
+                    list.innerHTML = data.music.map(m => `
+                        <li class="vinyl-item">
+                            <span><strong>${m.artist}</strong> — ${m.album}</span>
+                            <span class="bpm-tag">${m.bpm} BPM</span>
+                        </li>
+                    `).join('');
+                } else {
+                    list.innerHTML = '<li class="vinyl-item">No records logged in the database yet.</li>';
+                }
+            } catch (err) {
+                console.error("Dashboard sync failed:", err);
+            }
         }
+
+        async function logWorkout() {
+            const bpmInput = document.getElementById('input-bpm');
+            const minsInput = document.getElementById('input-mins');
+            
+            const bpm = parseInt(bpmInput.value);
+            const minutes = parseInt(minsInput.value);
+
+            if (!bpm || !minutes) return alert("Please enter both BPM and Duration!");
+
+            const res = await fetch('/workout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bpm, minutes })
+            });
+
+            if (res.ok) {
+                bpmInput.value = '';
+                minsInput.value = '';
+                // Flash the weekly-mins green to show success
+                document.getElementById('weekly-mins').style.color = 'var(--success)';
+                setTimeout(() => { document.getElementById('weekly-mins').style.color = 'var(--accent)'; }, 2000);
+                refreshStats(); 
+            } else {
+                alert("Failed to save workout. Check server console.");
+            }
+        }
+
+        // Initial load
         refreshStats();
-        setInterval(refreshStats, 30000); // Auto-refresh every 30s
+        // Auto-refresh every 30 seconds
+        setInterval(refreshStats, 30000);
     </script>
 </body>
 </html>
