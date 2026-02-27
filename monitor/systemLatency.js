@@ -1,41 +1,70 @@
 // A simple "Heartbeat" monitor for your IT Infrastructure
+import postgres from "https://deno.land/x/postgresjs/mod.js";
 import ping from "npm:ping";
+
+// 1. Initialize a single, persistent connection pool
+const databaseUrl = Deno.env.get("DATABASE_URL");
+if (!databaseUrl) {
+    console.error("❌ Error: DATABASE_URL environment variable is not set.");
+    Deno.exit(1);
+}
+
+const sql = postgres(databaseUrl);
+
+/**
+ * Save metrics to the PostgreSQL 'system_metrics' table
+ */
+async function saveMetric(type, value) {
+    try {
+        await sql`
+            INSERT INTO system_metrics (metric_type, value_ms)
+            VALUES (${type}, ${value})
+        `;
+        console.log(`✅ Persisted ${type}: ${value}ms`);
+    } catch (err) {
+        console.error(`❌ Database Save Failed for ${type}:`, err.message);
+    }
+}
 
 async function checkSystemLatency() {
     const host = '192.168.1.1'; // Your Router
     
-    // Track start time to calculate fetch latency
-    const start = performance.now();
-    
-    // Using '_res' tells the linter we are intentionally not using the response body
-    const _res = await fetch("https://api.latency.app/grooves");
-    
-    const end = performance.now();
-    
-    // Calculate actual request duration in milliseconds
-    const requestLatency = Math.round(end - start);
-    
-    // Perform the local ping
-    const pingRes = await ping.promise.probe(host);
-    
-    console.log(`Current IT Latency: ${requestLatency}ms`);
-    console.log(`Router Ping (${host}): ${pingRes.time}ms`);
-    
-    // LOGIC BRIDGE: If latency is > 50ms, flag it for the dashboard
-    if (requestLatency > 50) {
-        saveMetric('network_lag', requestLatency);
+    try {
+        const start = performance.now();
+        
+        // 2. Measure API Latency
+        const response = await fetch("https://api.latency.app/grooves");
+        if (!response.ok) throw new Error(`API Status: ${response.status}`);
+        
+        // Use the response to satisfy the linter/ensure completion
+        await response.body?.cancel(); 
+
+        const end = performance.now();
+        const requestLatency = Math.round(end - start);
+        
+        // 3. Measure Router Ping
+        const pingRes = await ping.promise.probe(host);
+        const routerLatency = Math.round(pingRes.time);
+        
+        console.log(`--- Report: ${new Date().toLocaleTimeString()} ---`);
+        console.log(`IT Latency: ${requestLatency}ms | Router: ${routerLatency}ms`);
+        
+        // 4. Record to Database
+        await saveMetric('network_lag', requestLatency);
+        await saveMetric('router_ping', routerLatency);
+
+        // Logic Bridge: Alert if lag is high
+        if (requestLatency > 50) {
+            console.warn("⚠️ High Latency Detected!");
+        }
+
+    } catch (error) {
+        console.error("[MONITOR ERROR]:", error.message);
+        await saveMetric('system_status', 0); // Log offline status
     }
 }
 
-/**
- * Placeholder for storing metrics. 
- * In production, this would hit your PostgreSQL 'system_metrics' table.
- */
-function saveMetric(type, value) {
-    console.warn(`[METRIC] Recording ${type}: ${value}ms`);
-}
-
-// Initial run
+// Initial execution
 checkSystemLatency();
 
 // Run every 60 seconds
