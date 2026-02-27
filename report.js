@@ -19,7 +19,15 @@ async function generateReport() {
             AND captured_at > NOW() - INTERVAL '24 hours'
         `;
 
-        // 2. QUERY: Workout/Vinyl Stats (All time)
+        // 2. QUERY: Weekly Goal Progress (Starting Monday)
+        const [weeklyProgress] = await sql`
+            SELECT SUM(value_ms) / 60000 as minutes
+            FROM system_metrics
+            WHERE metric_type = 'vinyl_workout_time'
+            AND captured_at > date_trunc('week', NOW())
+        `;
+
+        // 3. QUERY: Lifetime Workout Stats
         const [workoutStats] = await sql`
             SELECT 
                 SUM(value_ms) / 60000 as total_minutes,
@@ -28,7 +36,7 @@ async function generateReport() {
             WHERE metric_type = 'vinyl_workout_time'
         `;
 
-        // 3. QUERY: Recently Spun Vinyls (Joined from your 'grooves' table)
+        // 4. QUERY: Recently Spun Vinyls (from 'grooves' table)
         const musicPlayed = await sql`
             SELECT artist, album, bpm
             FROM grooves
@@ -36,8 +44,7 @@ async function generateReport() {
             LIMIT 5
         `;
 
-        // 4. MAINTENANCE: Delete latency noise older than 30 days
-        // We PROTECT 'vinyl_%' metrics so your workout history is permanent.
+        // 5. MAINTENANCE: Delete latency noise older than 30 days
         const deleted = await sql`
             DELETE FROM system_metrics 
             WHERE captured_at < NOW() - INTERVAL '30 days'
@@ -57,27 +64,15 @@ async function generateReport() {
         console.log(`   Data Points: ${latencyStats?.data_points || 0}`);
         console.log(`-----------------------------------------`);
 
-        console.log(`💪 WORKOUT SUMMARY`);
-        console.log(`   Total Time:  ${Math.round(workoutStats?.total_minutes || 0)} mins`);
-        console.log(`   Avg Session: ${Math.round(workoutStats?.avg_session || 0)} mins`);
+        const goal = 300; // 5 hours in minutes
+        const current = Math.round(weeklyProgress?.minutes || 0);
+        const remaining = Math.max(0, goal - current);
+
+        console.log(`🎯 WEEKLY GOAL PROGRESS (Target: 5hrs)`);
+        console.log(`   Done:      ${current} / ${goal} mins`);
+        console.log(`   Remaining: ${remaining} mins ${remaining === 0 ? '🔥 GOAL MET!' : ''}`);
         console.log(`-----------------------------------------`);
 
-        console.log(`💿 RECENTLY SPUN`);
-        if (musicPlayed.length > 0) {
-            musicPlayed.forEach(row => {
-                console.log(`   • ${row.artist} - ${row.album} (${row.bpm} BPM)`);
-            });
-        } else {
-            console.log("   No vinyl records logged yet.");
-        }
-
-    } catch (err) {
-        console.error("❌ Failed to generate report:", err.message);
-    } finally {
-        // Close connection so the script finishes immediately
-        await sql.end();
-    }
-}
-
-generateReport();
+        console.log(`💪 LIFETIME WORKOUTS`);
+        console.log(`   Total Time:  ${Math.round
 
