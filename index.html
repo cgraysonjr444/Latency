@@ -2,200 +2,118 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GroovePulse Tracker</title>
-    
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#0f172a">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3504/3504958.png">
-    <link rel="manifest" href="manifest.json">
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vinyl Pulse | Latency & RPM Tracker</title>
     <style>
-        :root { 
-            --bg: #0f172a; 
-            --card: rgba(30, 41, 59, 0.7); 
-            --accent: #38bdf8; 
-            --success: #4ade80;
-            --text: #f1f5f9; 
-            --input-bg: rgba(15, 23, 42, 0.5);
-        }
-
-        body.light-mode {
-            --bg: #f1f5f9;
-            --card: rgba(255, 255, 255, 0.8);
-            --accent: #0ea5e9;
-            --text: #1e293b;
-            --input-bg: #ffffff;
-        }
-
-        body { 
-            background: var(--bg); 
-            color: var(--text); 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            display: flex; 
-            justify-content: center; 
-            padding: 20px; 
-            margin: 0;
-            transition: background 0.3s, color 0.3s;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        .grid { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
-            gap: 20px; 
-            width: 100%; 
-            max-width: 1000px; 
-        }
-
-        .header-area {
-            grid-column: 1 / -1;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 5px;
-        }
-        
-        h1 { margin: 0; color: var(--accent); letter-spacing: 1px; font-size: 1.4rem; font-weight: 800; }
-
-        #theme-toggle {
-            background: var(--card);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: var(--text);
-            padding: 10px;
-            border-radius: 50%;
-            cursor: pointer;
-            width: 44px;
-            height: 44px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .card { 
-            background: var(--card); 
-            backdrop-filter: blur(12px); 
-            padding: 24px; 
-            border-radius: 20px; 
-            border: 1px solid rgba(255,255,255,0.1); 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
-        }
-
-        .stat { font-size: 2.8rem; font-weight: 800; margin: 5px 0; color: var(--accent); }
-        .label { font-size: 0.75rem; opacity: 0.6; text-transform: uppercase; font-weight: bold; letter-spacing: 1.5px; }
-        
-        .form-group { display: flex; flex-direction: column; gap: 12px; margin-top: 15px; }
-        input { 
-            padding: 14px; border-radius: 12px; 
-            border: 1px solid rgba(0,0,0,0.1); 
-            background: var(--input-bg); color: var(--text); font-size: 1rem;
-            outline: none;
-        }
-        
-        button#save-btn { 
-            background: var(--accent); color: white; border: none; 
-            padding: 14px; border-radius: 12px; font-weight: bold; font-size: 1rem; cursor: pointer;
-            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.4);
-        }
-
-        .vinyl-item { 
-            padding: 15px 0; border-bottom: 1px solid rgba(128,128,128,0.1); 
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .bpm-tag { background: var(--accent); color: var(--bg); padding: 2px 8px; border-radius: 6px; font-weight: bold; font-size: 0.8rem; }
+        body { font-family: 'Courier New', Courier, monospace; background: #121212; color: #00ff41; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .container { border: 2px solid #00ff41; padding: 20px; border-radius: 10px; background: #000; box-shadow: 0 0 15px #00ff41; width: 90%; max-width: 500px; text-align: center; }
+        button { background: #00ff41; color: #000; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; margin: 10px 0; border-radius: 5px; }
+        button:hover { background: #008f11; }
+        .status { margin-top: 15px; font-size: 0.9em; color: #888; }
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+        th, td { border-bottom: 1px solid #333; padding: 8px; text-align: left; }
     </style>
 </head>
 <body>
-    <div class="grid">
-        <div class="header-area">
-            <h1>GROOVE PULSE</h1>
-            <button id="theme-toggle" onclick="toggleTheme()">🌓</button>
-        </div>
 
-        <div class="card">
-            <div class="label">Net Latency</div>
-            <div id="avg-lag" class="stat">--</div>
-            <div class="label">ms Avg</div>
-        </div>
+    <div class="container">
+        <h1>VINYL PULSE 💿</h1>
+        <p>Real-time RPM & Latency Tracking</p>
+        
+        <hr style="border: 0.5px solid #333;">
 
-        <div class="card">
-            <div class="label">Workout</div>
-            <div id="weekly-mins" class="stat">--</div>
-            <div class="label">mins this week</div>
-        </div>
+        <h3>Test Latency</h3>
+        <button onclick="pingServer()">SEND PULSE</button>
+        <p id="latency-result">Result: -- ms</p>
 
-        <div class="card" style="grid-column: 1 / -1;">
-            <div class="label">Log Session</div>
-            <div class="form-group">
-                <input type="number" id="input-bpm" placeholder="Track BPM (e.g. 128)" inputmode="numeric">
-                <input type="number" id="input-mins" placeholder="Session Minutes" inputmode="numeric">
-                <button id="save-btn" onclick="logWorkout()">SAVE TO CLOUD</button>
-            </div>
-        </div>
+        <hr style="border: 0.5px solid #333;">
 
-        <div class="card" style="grid-column: 1 / -1;">
-            <div class="label">Recent Spins</div>
-            <ul id="vinyl-list" style="list-style: none; padding: 0;"></ul>
-        </div>
+        <h3>Log Spin</h3>
+        <input type="number" id="rpm-input" placeholder="RPM (e.g. 33.3)" step="0.1" style="padding: 5px;">
+        <button onclick="saveSpin()">SAVE SESSION</button>
+
+        <div class="status" id="db-status">Checking Database Connection...</div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>RPM</th>
+                </tr>
+            </thead>
+            <tbody id="history-body">
+                </tbody>
+        </table>
     </div>
 
     <script>
-        // Set this to your local IP or your Cloud URL
-        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-            ? '' 
-            : 'http://YOUR_COMPUTER_IP:8000'; // Replace with your IP for local Wi-Fi testing
+        // 🚨 YOUR LIVE RENDER URL GOES HERE 🚨
+        const API_BASE = "https://vinyl-pulse-api.onrender.com"; 
 
-        function toggleTheme() {
-            document.body.classList.toggle('light-mode');
-            localStorage.setItem('theme', document.body.classList.contains('light-mode') ? 'light' : 'dark');
-        }
-
-        if (localStorage.getItem('theme') === 'light') document.body.classList.add('light-mode');
-
-        async function refreshStats() {
-            try {
-                const res = await fetch(`${API_BASE}/api/stats`);
-                const data = await res.json();
-                document.getElementById('avg-lag').innerText = data.latency.avg_lag;
-                document.getElementById('weekly-mins').innerText = data.workout.weekly_mins;
-
-                const list = document.getElementById('vinyl-list');
-                list.innerHTML = data.music.map(m => `
-                    <li class="vinyl-item">
-                        <span><strong>${m.artist}</strong><br><small>${m.album}</small></span>
-                        <span class="bpm-tag">${m.bpm} BPM</span>
-                    </li>
-                `).join('');
-            } catch (e) { console.log("Waiting for server..."); }
-        }
-
-        async function logWorkout() {
-            const bpm = document.getElementById('input-bpm').value;
-            const minutes = document.getElementById('input-mins').value;
-            if (!bpm || !minutes) return alert("Fill in the grooves!");
-
-            const btn = document.getElementById('save-btn');
-            btn.innerText = "SAVING...";
+        // 1. Ping Server (Latency Test)
+        async function pingServer() {
+            const start = Date.now();
+            const resultText = document.getElementById('latency-result');
+            resultText.innerText = "Sending...";
 
             try {
-                const res = await fetch(`${API_BASE}/workout`, {
+                const response = await fetch(`${API_BASE}/ping`);
+                if (response.ok) {
+                    const end = Date.now();
+                    resultText.innerText = `Result: ${end - start}ms`;
+                }
+            } catch (err) {
+                resultText.innerText = "Result: Server Offline";
+                console.error(err);
+            }
+        }
+
+        // 2. Save Spin Data to Postgres
+        async function saveSpin() {
+            const rpm = document.getElementById('rpm-input').value;
+            if (!rpm) return alert("Enter an RPM value!");
+
+            try {
+                const response = await fetch(`${API_BASE}/spins`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ bpm: parseInt(bpm), minutes: parseInt(minutes) })
+                    body: JSON.stringify({ rpm: parseFloat(rpm) })
                 });
 
-                if (res.ok) {
-                    document.getElementById('input-bpm').value = '';
-                    document.getElementById('input-mins').value = '';
-                    refreshStats();
+                if (response.ok) {
+                    alert("Spin Saved to Database! 💿");
+                    loadHistory();
                 }
-            } catch (e) { alert("Server not reachable!"); }
-            btn.innerText = "SAVE TO CLOUD";
+            } catch (err) {
+                alert("Failed to save spin.");
+                console.error(err);
+            }
         }
 
-        refreshStats();
-        setInterval(refreshStats, 10000);
+        // 3. Load History from Postgres
+        async function loadHistory() {
+            const status = document.getElementById('db-status');
+            try {
+                const response = await fetch(`${API_BASE}/history`);
+                const data = await response.json();
+                
+                const tbody = document.getElementById('history-body');
+                tbody.innerHTML = '';
+                
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${new Date(row.created_at).toLocaleDateString()}</td><td>${row.rpm}</td>`;
+                    tbody.appendChild(tr);
+                });
+
+                status.innerText = "Database: Connected ✅";
+            } catch (err) {
+                status.innerText = "Database: Connection Error ❌";
+            }
+        }
+
+        // Load history on startup
+        loadHistory();
     </script>
 </body>
 </html>
