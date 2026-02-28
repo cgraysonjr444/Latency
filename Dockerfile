@@ -1,19 +1,18 @@
 FROM denoland/deno:alpine-1.41.0
 
-# Set the working directory inside the container
+# Set the working directory
 WORKDIR /app
 
-# Prefer non-root user for security
+# Copy files and EXPLICITLY set ownership to the deno user
+COPY --chown=deno:deno . .
+
+# Now switch to the deno user
 USER deno
 
-# Copy the project files into the container
-COPY . .
-
-# Cache dependencies (optional but speeds up restarts)
+# Cache dependencies
 RUN deno cache schema/server.js
 
-# The critical fix: Adding the unsafe certificate flag 
-# and necessary permissions for Render
+# Run the app with the necessary flags
 CMD ["run", \
      "--allow-net", \
      "--allow-env", \
