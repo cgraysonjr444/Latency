@@ -1,11 +1,10 @@
 FROM denoland/deno:alpine-1.41.0
 
-# Set the working directory
+# Set the working directory inside the container
 WORKDIR /app
 
-# Copy all files to the container
+# Copy everything from your GitHub (including the schema folder)
 COPY . .
 
-# Grant permissions and run the server
-# Note: Render provides the PORT env variable automatically
-CMD ["run", "--allow-net", "--allow-env", "--allow-read", "server.js"]
+# Grant permissions and point Deno to the file inside the schema folder
+CMD ["run", "--allow-net", "--allow-env", "--allow-read", "schema/server.js"]
