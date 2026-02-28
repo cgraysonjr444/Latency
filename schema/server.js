@@ -34,12 +34,12 @@ async function initializeDatabase() {
 await initializeDatabase();
 
 // --- OPTION 2: PORT BINDING FOR RENDER ---
-// This opens a tiny web server so Render's "Port Scan" succeeds.
 const PORT = parseInt(Deno.env.get("PORT") || "10000");
 
 console.log(`🚀 Port binding active on port ${PORT}. Service is staying alive.`);
 
-Deno.serve({ port: PORT }, (req) => {
+// Use _req to satisfy the linter
+Deno.serve({ port: PORT }, (_req) => {
   return new Response("Latency Service: Online", { status: 200 });
 });
 
