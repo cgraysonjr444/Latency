@@ -1,17 +1,15 @@
 import postgres from "https://deno.land/x/postgresjs@v3.3.3/mod.js";
 
 // 1. Initialize the database connection
-// It will pull the connection string from your Render Environment Variables
 const sql = postgres(Deno.env.get("DATABASE_URL"), {
-  ssl: { rejectUnauthorized: false }, // Matches your current working config
+  ssl: { rejectUnauthorized: false },
 });
 
 async function initializeDatabase() {
   try {
     console.log("Connecting to database...");
 
-    // 2. Your Table Schema Logic
-    // Using 'IF NOT EXISTS' is the standard way to avoid the "already exists" error
+    // 2. Ensure table exists
     await sql`
       CREATE TABLE IF NOT EXISTS spins (
         id SERIAL PRIMARY KEY,
@@ -22,31 +20,30 @@ async function initializeDatabase() {
 
     console.log("✅ Database connected and table 'spins' is ready!");
 
-    // Optional: Test query to confirm access
+    // Test query
     const result = await sql`SELECT NOW()`;
     console.log("Current DB Time:", result[0].now);
 
   } catch (err) {
     console.error("❌ Database initialization failed:");
     console.error(err);
-    // We don't exit here so you can see the logs on Render
   }
 }
 
-// Execute the DB logic
+// Run the DB logic
 await initializeDatabase();
 
-// --- PATH C: KEEP-ALIVE ---
-console.log("🚀 Background task started. Keeping process alive...");
+// --- OPTION 2: PORT BINDING FOR RENDER ---
+// This opens a tiny web server so Render's "Port Scan" succeeds.
+const PORT = parseInt(Deno.env.get("PORT") || "10000");
 
-// This interval prevents the Deno event loop from finishing.
-// It logs a heartbeat every hour to keep the logs clean but the process active.
+console.log(`🚀 Port binding active on port ${PORT}. Service is staying alive.`);
+
+Deno.serve({ port: PORT }, (req) => {
+  return new Response("Latency Service: Online", { status: 200 });
+});
+
+// --- HEARTBEAT ---
 setInterval(() => {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] Heartbeat: Latency service is still active.`);
+  console.log(`[${new Date().toISOString()}] Heartbeat: Service is active.`);
 }, 1000 * 60 * 60);
-
-// Note: If Render shows a "Port scan failed" error, 
-// change the Service Type in Render settings to "Background Worker".
-
-// ... rest of your Deno.serve code ...
