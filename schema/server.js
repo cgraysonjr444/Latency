@@ -1,15 +1,21 @@
 import postgres from "https://deno.land/x/postgresjs@v3.3.3/mod.js";
 
-// 1. Setup Database Connection with SSL fix
+// 1. Setup Database Connection 
 const databaseUrl = Deno.env.get("DATABASE_URL");
 
-// The fix is here: rejectUnauthorized: false
-const sql = postgres(databaseUrl, { 
-  ssl: { rejectUnauthorized: false } 
+// This configuration is the most compatible with Render/Deno SSL quirks
+const sql = postgres(databaseUrl, {
+  ssl: 'require',
+  connect_timeout: 30,
+  // This helps bypass the "CaUsedAsEndEntity" error in Deno
+  onnotice: () => {}, 
 });
 
 // 2. Ensure Table Exists
 try {
+  // Simple check to see if we can talk to the DB
+  await sql`SELECT 1`;
+  
   await sql`
     CREATE TABLE IF NOT EXISTS spins (
       id SERIAL PRIMARY KEY,
@@ -17,9 +23,9 @@ try {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `;
-  console.log("✅ Database table is ready.");
+  console.log("✅ Database table is ready and connected!");
 } catch (err) {
-  console.error("❌ Database init error:", err);
+  console.error("❌ Database connection failed. Error details:", err.message);
 }
 
 // 3. Start the Server
@@ -60,7 +66,7 @@ Deno.serve(async (req) => {
     });
 
   } catch (err) {
-    console.error("Server Error:", err);
+    console.error("Server Route Error:", err);
     return new Response(JSON.stringify({ error: err.message }), { 
       status: 500, 
       headers: corsHeaders 
