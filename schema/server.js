@@ -1,6 +1,5 @@
 import postgres from "https://deno.land/x/postgresjs@v3.3.3/mod.js";
 
-// 1. Database Connection with a 10-second timeout to prevent "White Screen hangs"
 const databaseUrl = Deno.env.get("DATABASE_URL");
 const sql = databaseUrl 
   ? postgres(databaseUrl, { ssl: { rejectUnauthorized: false }, connect_timeout: 10 }) 
@@ -12,30 +11,36 @@ Deno.serve({ port: PORT }, async (req) => {
   const url = new URL(req.url);
   const headers = {
     "Access-Control-Allow-Origin": "*",
-    "Content-Type": "text/html",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
   };
 
-  // Handle /data requests for your GitHub frontend
+  if (req.method === "OPTIONS") return new Response(null, { headers });
+
+  // ROUTE: /data (JSON for GitHub)
   if (url.pathname === "/data") {
     try {
-      const data = sql ? await sql`SELECT * FROM spins LIMIT 10` : [];
+      const data = sql ? await sql`SELECT * FROM spins ORDER BY created_at DESC LIMIT 10` : [];
       return new Response(JSON.stringify(data), { 
         headers: { ...headers, "Content-Type": "application/json" } 
       });
     } catch (e) {
-      return new Response(JSON.stringify({ error: e.message }), { headers: { ...headers, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: e.message }), { 
+        headers: { ...headers, "Content-Type": "application/json" },
+        status: 500
+      });
     }
   }
 
-  // MAIN DASHBOARD (The "Safe" Version)
+  // ROUTE: Root (Visual Dashboard)
   let dbStatus = "Checking...";
-  let spinCount = "Unknown";
+  let spinCount = "0";
 
   try {
     if (!sql) {
-      dbStatus = "❌ DATABASE_URL missing in Render Env Vars";
+      dbStatus = "❌ DATABASE_URL missing";
     } else {
-      const result = await sql`SELECT count(*) FROM spins`.trim(); // Quick ping
+      const result = await sql`SELECT count(*) FROM spins`;
       dbStatus = "✅ Connected to Postgres";
       spinCount = result[0].count;
     }
@@ -46,20 +51,21 @@ Deno.serve({ port: PORT }, async (req) => {
   const html = `
     <!DOCTYPE html>
     <html>
-      <head><title>Latency Status</title></head>
+      <head>
+        <title>Latency Status</title>
+        <meta charset="UTF-8">
+      </head>
       <body style="font-family:sans-serif; background:#121212; color:white; padding:2rem; text-align:center;">
         <h1 style="color:#00ffcc;">💿 Latency Service</h1>
         <div style="background:#222; padding:2rem; border-radius:10px; display:inline-block; border:1px solid #333;">
           <p><strong>Server Status:</strong> <span style="color:#00ffcc;">ONLINE</span></p>
           <p><strong>Database:</strong> ${dbStatus}</p>
-          <p><strong>Spins Recorded:</strong> ${spinCount}</p>
+          <p><strong>Spins Recorded:</strong> <span style="color:#00ffcc; font-size:1.2rem;">${spinCount}</span></p>
         </div>
-        <p style="margin-top:2rem; color:#666;">If you see this, the server is working!</p>
+        <p style="margin-top:2rem;"><a href="/data" style="color:#00ffcc;">View API Data</a></p>
       </body>
     </html>
   `;
 
-  return new Response(html, { headers });
+  return new Response(html, { headers: { ...headers, "Content-Type": "text/html" } });
 });
-
-console.log(`🚀 Diagnostic Server running on ${PORT}`);
