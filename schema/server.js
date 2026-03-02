@@ -63,9 +63,9 @@ Deno.serve({ port: PORT }, async (req) => {
     if (!sql) {
       dbStatus = "❌ DATABASE_URL missing";
     } else {
-      const result = await sql`SELECT count(*) FROM spins`;
+      const countData = await sql`SELECT count(*) FROM spins`;
       dbStatus = "✅ Connected to Postgres";
-      spinCount = result[0].count;
+      spinCount = countData[0].count;
     }
 
     const html = `
@@ -79,4 +79,20 @@ Deno.serve({ port: PORT }, async (req) => {
             <p><strong>Database:</strong> ${dbStatus}</p>
             <p><strong>Spins Recorded:</strong> <span style="color:#00ffcc; font-size:1.5rem;">${spinCount}</span></p>
           </div>
-          <p style="margin
+          <p style="margin-top:2rem;"><a href="/data" style="color:#00ffcc;">View API Data</a></p>
+        </body>
+      </html>
+    `;
+
+    return new Response(html, { headers: { ...headers, "Content-Type": "text/html" } });
+
+  } catch (err) {
+    console.error("Server Error:", err);
+    return new Response(JSON.stringify({ error: err.message }), { 
+      status: 500, 
+      headers: { ...headers, "Content-Type": "application/json" } 
+    });
+  }
+}); // <--- THIS WAS THE MISSING LINE!
+
+console.log(`🚀 Server live on port ${PORT}`);
