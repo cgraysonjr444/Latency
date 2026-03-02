@@ -1,15 +1,11 @@
 import postgres from "https://deno.land/x/postgresjs@v3.3.3/mod.js";
 
-// 1. Initialize the database connection
 const sql = postgres(Deno.env.get("DATABASE_URL"), {
   ssl: { rejectUnauthorized: false },
 });
 
 async function initializeDatabase() {
   try {
-    console.log("Connecting to database...");
-
-    // 2. Ensure table exists
     await sql`
       CREATE TABLE IF NOT EXISTS spins (
         id SERIAL PRIMARY KEY,
@@ -17,33 +13,48 @@ async function initializeDatabase() {
         data JSONB
       );
     `;
-
-    console.log("✅ Database connected and table 'spins' is ready!");
-
-    // Test query
-    const result = await sql`SELECT NOW()`;
-    console.log("Current DB Time:", result[0].now);
-
+    console.log("✅ Database ready.");
   } catch (err) {
-    console.error("❌ Database initialization failed:");
-    console.error(err);
+    console.error("❌ Database initialization failed:", err);
   }
 }
 
-// Run the DB logic
 await initializeDatabase();
 
-// --- OPTION 2: PORT BINDING FOR RENDER ---
 const PORT = parseInt(Deno.env.get("PORT") || "10000");
 
-console.log(`🚀 Port binding active on port ${PORT}. Service is staying alive.`);
+Deno.serve({ port: PORT }, async (req) => {
+  const url = new URL(req.url);
 
-// Use _req to satisfy the linter
-Deno.serve({ port: PORT }, (_req) => {
-  return new Response("Latency Service: Online", { status: 200 });
+  try {
+    // 1. Fetch the last 10 spins from the database
+    const recentSpins = await sql`
+      SELECT id, created_at, data 
+      FROM spins 
+      ORDER BY created_at DESC 
+      LIMIT 10
+    `;
+
+    // 2. If the user visits /data, show the JSON
+    if (url.pathname === "/data") {
+      return new Response(JSON.stringify(recentSpins, null, 2), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+
+    // 3. Default view: Show status and count
+    const countResult = await sql`SELECT count(*) FROM spins`;
+    const count = countResult[0].count;
+
+    return new Response(
+      `Latency Service: Online\n\nTotal Spins in DB: ${count}\nVisit /data to see the latest entries.`,
+      { headers: { "content-type": "text/plain" } }
+    );
+
+  } catch (err) {
+    console.error("Query error:", err);
+    return new Response("Database Query Error", { status: 500 });
+  }
 });
 
-// --- HEARTBEAT ---
-setInterval(() => {
-  console.log(`[${new Date().toISOString()}] Heartbeat: Service is active.`);
-}, 1000 * 60 * 60);
+console.log(`🚀 Server listening on port ${PORT}`);
