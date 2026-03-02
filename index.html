@@ -1,20 +1,30 @@
 <script>
-  // 1. CHANGE THIS TO YOUR ACTUAL RENDER URL
-  const RENDER_URL = "https://latency-your-app-name.onrender.com";
+  // 1. UPDATED WITH YOUR ACTUAL RENDER URL
+  const RENDER_URL = "https://latency-8zo5.onrender.com";
 
   async function checkServerStatus() {
-    const statusEl = document.getElementById('server-status'); // Adjust ID to match your HTML
+    // Look for the elements
+    const statusEl = document.getElementById('server-status');
     const dbStatusEl = document.getElementById('db-status');
 
+    // Safety Check: If these IDs don't exist in your HTML yet, the script will stop here instead of crashing the whole page
+    if (!statusEl || !dbStatusEl) {
+      console.error("Could not find server-status or db-status elements in the HTML.");
+      return;
+    }
+
     try {
-      // We hit the /data endpoint we created earlier
+      // Show "Loading..." while we wait
+      statusEl.innerText = "Checking Server...";
+      
       const response = await fetch(`${RENDER_URL}/data`);
       
       if (response.ok) {
         const data = await response.json();
         statusEl.innerText = "Result: Server Online ✅";
-        dbStatusEl.innerText = `Database: Connected (${data.length} records found)`;
-        console.log("Latest Spins:", data);
+        // Check if data is an array (our Deno server returns an array)
+        const count = Array.isArray(data) ? data.length : 0;
+        dbStatusEl.innerText = `Database: Connected (${count} records found)`;
       } else {
         throw new Error("Server responded with error");
       }
@@ -25,10 +35,10 @@
     }
   }
 
-  // Run the check when the page loads
-  window.onload = checkServerStatus;
+  // Use addEventListener instead of window.onload for better compatibility
+  window.addEventListener('load', checkServerStatus);
 
-  // Example: How to Log a Spin (if you add the POST route later)
+  // Function to send data to the database
   async function logSpin(spinData) {
     try {
       const response = await fetch(`${RENDER_URL}/spin`, {
