@@ -1,54 +1,62 @@
-<script>
-  // 1. UPDATED WITH YOUR ACTUAL RENDER URL
-  const RENDER_URL = "https://latency-8zo5.onrender.com";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VINYL PULSE 💿</title>
+    <style>
+        body { font-family: sans-serif; background: #121212; color: white; text-align: center; padding: 2rem; }
+        .box { background: #222; padding: 20px; border-radius: 10px; border: 1px solid #333; display: inline-block; min-width: 300px; }
+        .status { margin: 10px 0; font-weight: bold; }
+        .green { color: #00ffcc; }
+        .red { color: #ff4444; }
+    </style>
+</head>
+<body>
 
-  async function checkServerStatus() {
-    // Look for the elements
-    const statusEl = document.getElementById('server-status');
-    const dbStatusEl = document.getElementById('db-status');
+    <h1>VINYL PULSE 💿</h1>
+    <p>Real-time RPM & Latency Tracking</p>
 
-    // Safety Check: If these IDs don't exist in your HTML yet, the script will stop here instead of crashing the whole page
-    if (!statusEl || !dbStatusEl) {
-      console.error("Could not find server-status or db-status elements in the HTML.");
-      return;
-    }
+    <div class="box">
+        <div id="server-status" class="status">Checking Server...</div>
+        <div id="db-status" class="status">Connecting to Database...</div>
+    </div>
 
-    try {
-      // Show "Loading..." while we wait
-      statusEl.innerText = "Checking Server...";
-      
-      const response = await fetch(`${RENDER_URL}/data`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        statusEl.innerText = "Result: Server Online ✅";
-        // Check if data is an array (our Deno server returns an array)
-        const count = Array.isArray(data) ? data.length : 0;
-        dbStatusEl.innerText = `Database: Connected (${count} records found)`;
-      } else {
-        throw new Error("Server responded with error");
-      }
-    } catch (err) {
-      statusEl.innerText = "Result: Server Offline ❌";
-      dbStatusEl.innerText = "Database: Connection Error ❌";
-      console.error("Connection failed:", err);
-    }
-  }
+    <script>
+        // Use your specific Render URL
+        const RENDER_URL = "https://latency-8zo5.onrender.com";
 
-  // Use addEventListener instead of window.onload for better compatibility
-  window.addEventListener('load', checkServerStatus);
+        async function checkServerStatus() {
+            const statusEl = document.getElementById('server-status');
+            const dbStatusEl = document.getElementById('db-status');
 
-  // Function to send data to the database
-  async function logSpin(spinData) {
-    try {
-      const response = await fetch(`${RENDER_URL}/spin`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(spinData)
-      });
-      return await response.json();
-    } catch (err) {
-      console.error("Log spin failed", err);
-    }
-  }
-</script>
+            try {
+                // Fetch data from Render
+                const response = await fetch(`${RENDER_URL}/data`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    statusEl.innerText = "Result: Server Online ✅";
+                    statusEl.className = "status green";
+                    
+                    // Show how many spins are in the DB
+                    const count = Array.isArray(data) ? data.length : 0;
+                    dbStatusEl.innerText = `Database: Connected (${count} records)`;
+                    dbStatusEl.className = "status green";
+                } else {
+                    throw new Error("Server response not OK");
+                }
+            } catch (err) {
+                statusEl.innerText = "Result: Server Offline ❌";
+                statusEl.className = "status red";
+                dbStatusEl.innerText = "Database: Connection Error ❌";
+                dbStatusEl.className = "status red";
+                console.error("Connection failed:", err);
+            }
+        }
+
+        // Run when page is ready
+        window.addEventListener('DOMContentLoaded', checkServerStatus);
+    </script>
+</body>
+</html>
