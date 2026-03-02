@@ -1,119 +1,44 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vinyl Pulse | Latency & RPM Tracker</title>
-    <style>
-        body { font-family: 'Courier New', Courier, monospace; background: #121212; color: #00ff41; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .container { border: 2px solid #00ff41; padding: 20px; border-radius: 10px; background: #000; box-shadow: 0 0 15px #00ff41; width: 90%; max-width: 500px; text-align: center; }
-        button { background: #00ff41; color: #000; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; margin: 10px 0; border-radius: 5px; }
-        button:hover { background: #008f11; }
-        .status { margin-top: 15px; font-size: 0.9em; color: #888; }
-        table { width: 100%; margin-top: 20px; border-collapse: collapse; }
-        th, td { border-bottom: 1px solid #333; padding: 8px; text-align: left; }
-    </style>
-</head>
-<body>
+<script>
+  // 1. CHANGE THIS TO YOUR ACTUAL RENDER URL
+  const RENDER_URL = "https://latency-your-app-name.onrender.com";
 
-    <div class="container">
-        <h1>VINYL PULSE 💿</h1>
-        <p>Real-time RPM & Latency Tracking</p>
-        
-        <hr style="border: 0.5px solid #333;">
+  async function checkServerStatus() {
+    const statusEl = document.getElementById('server-status'); // Adjust ID to match your HTML
+    const dbStatusEl = document.getElementById('db-status');
 
-        <h3>Test Latency</h3>
-        <button onclick="pingServer()">SEND PULSE</button>
-        <p id="latency-result">Result: -- ms</p>
+    try {
+      // We hit the /data endpoint we created earlier
+      const response = await fetch(`${RENDER_URL}/data`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        statusEl.innerText = "Result: Server Online ✅";
+        dbStatusEl.innerText = `Database: Connected (${data.length} records found)`;
+        console.log("Latest Spins:", data);
+      } else {
+        throw new Error("Server responded with error");
+      }
+    } catch (err) {
+      statusEl.innerText = "Result: Server Offline ❌";
+      dbStatusEl.innerText = "Database: Connection Error ❌";
+      console.error("Connection failed:", err);
+    }
+  }
 
-        <hr style="border: 0.5px solid #333;">
+  // Run the check when the page loads
+  window.onload = checkServerStatus;
 
-        <h3>Log Spin</h3>
-        <input type="number" id="rpm-input" placeholder="RPM (e.g. 33.3)" step="0.1" style="padding: 5px;">
-        <button onclick="saveSpin()">SAVE SESSION</button>
-
-        <div class="status" id="db-status">Checking Database Connection...</div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>RPM</th>
-                </tr>
-            </thead>
-            <tbody id="history-body">
-                </tbody>
-        </table>
-    </div>
-
-    <script>
-        // 🚨 YOUR LIVE RENDER URL GOES HERE 🚨
-        const API_BASE = "https://vinyl-pulse-api.onrender.com"; 
-
-        // 1. Ping Server (Latency Test)
-        async function pingServer() {
-            const start = Date.now();
-            const resultText = document.getElementById('latency-result');
-            resultText.innerText = "Sending...";
-
-            try {
-                const response = await fetch(`${API_BASE}/ping`);
-                if (response.ok) {
-                    const end = Date.now();
-                    resultText.innerText = `Result: ${end - start}ms`;
-                }
-            } catch (err) {
-                resultText.innerText = "Result: Server Offline";
-                console.error(err);
-            }
-        }
-
-        // 2. Save Spin Data to Postgres
-        async function saveSpin() {
-            const rpm = document.getElementById('rpm-input').value;
-            if (!rpm) return alert("Enter an RPM value!");
-
-            try {
-                const response = await fetch(`${API_BASE}/spins`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ rpm: parseFloat(rpm) })
-                });
-
-                if (response.ok) {
-                    alert("Spin Saved to Database! 💿");
-                    loadHistory();
-                }
-            } catch (err) {
-                alert("Failed to save spin.");
-                console.error(err);
-            }
-        }
-
-        // 3. Load History from Postgres
-        async function loadHistory() {
-            const status = document.getElementById('db-status');
-            try {
-                const response = await fetch(`${API_BASE}/history`);
-                const data = await response.json();
-                
-                const tbody = document.getElementById('history-body');
-                tbody.innerHTML = '';
-                
-                data.forEach(row => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `<td>${new Date(row.created_at).toLocaleDateString()}</td><td>${row.rpm}</td>`;
-                    tbody.appendChild(tr);
-                });
-
-                status.innerText = "Database: Connected ✅";
-            } catch (err) {
-                status.innerText = "Database: Connection Error ❌";
-            }
-        }
-
-        // Load history on startup
-        loadHistory();
-    </script>
-</body>
-</html>
+  // Example: How to Log a Spin (if you add the POST route later)
+  async function logSpin(spinData) {
+    try {
+      const response = await fetch(`${RENDER_URL}/spin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(spinData)
+      });
+      return await response.json();
+    } catch (err) {
+      console.error("Log spin failed", err);
+    }
+  }
+</script>
