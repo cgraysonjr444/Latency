@@ -6,12 +6,11 @@ const sql = databaseUrl
   ? postgres(databaseUrl, { ssl: { rejectUnauthorized: false }, connect_timeout: 10 }) 
   : null;
 
+// Ensure table and columns exist on startup
 async function initializeDatabase() {
   if (!sql) return;
   try {
-    // Ensure table exists
     await sql`CREATE TABLE IF NOT EXISTS spins (id SERIAL PRIMARY KEY, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
-    // Ensure 'data' column exists
     await sql`ALTER TABLE spins ADD COLUMN IF NOT EXISTS data JSONB;`;
     console.log("✅ Database schema is ready.");
   } catch (err) {
@@ -41,10 +40,10 @@ Deno.serve({ port: PORT }, async (req) => {
       try {
         const body = await req.json();
         
-        // Use JSON.stringify to ensure Postgres sees a valid JSON string
+        // Use the library's built-in json helper to fix the 500 error
         const result = await sql`
           INSERT INTO spins (data) 
-          VALUES (${JSON.stringify(body)}) 
+          VALUES (${ sql.json(body) }) 
           RETURNING id, created_at
         `;
         
@@ -52,7 +51,7 @@ Deno.serve({ port: PORT }, async (req) => {
           headers: { ...headers, "Content-Type": "application/json" } 
         });
       } catch (insertErr) {
-        console.error("Insert Error:", insertErr);
+        console.error("Insert Error:", insertErr.message);
         return new Response(JSON.stringify({ error: insertErr.message }), { 
           status: 500, 
           headers: { ...headers, "Content-Type": "application/json" } 
