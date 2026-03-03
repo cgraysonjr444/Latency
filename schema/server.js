@@ -9,8 +9,9 @@ const sql = databaseUrl
 async function initializeDatabase() {
   if (!sql) return;
   try {
-    // Ensure table and the 'data' column exist
+    // Ensure table exists
     await sql`CREATE TABLE IF NOT EXISTS spins (id SERIAL PRIMARY KEY, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
+    // Ensure 'data' column exists (fixes the previous error)
     await sql`ALTER TABLE spins ADD COLUMN IF NOT EXISTS data JSONB;`;
     console.log("✅ Database schema is ready.");
   } catch (err) {
@@ -24,7 +25,7 @@ const PORT = parseInt(Deno.env.get("PORT") || "10000");
 Deno.serve({ port: PORT }, async (req) => {
   const url = new URL(req.url);
 
-  // 2. Mandatory CORS Headers for GitHub Pages
+  // 2. Mandatory CORS Headers (Crucial for GitHub Pages communication)
   const headers = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -35,20 +36,23 @@ Deno.serve({ port: PORT }, async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers });
 
   try {
-    // --- ROUTE: POST /spin (Save new data) ---
+    // --- ROUTE 1: POST /spin (Save new data from your button) ---
     if (url.pathname === "/spin" && req.method === "POST") {
       const body = await req.json();
+      
+      // We insert the JSON object directly into the 'data' column
       const result = await sql`
         INSERT INTO spins (data) 
         VALUES (${body}) 
         RETURNING id, created_at
       `;
+      
       return new Response(JSON.stringify({ success: true, saved: result[0] }), { 
         headers: { ...headers, "Content-Type": "application/json" } 
       });
     }
 
-    // --- ROUTE: GET /data (Fetch last 10 for frontend) ---
+    // --- ROUTE 2: GET /data (Fetch records for the History Table) ---
     if (url.pathname === "/data") {
       const data = sql ? await sql`SELECT * FROM spins ORDER BY created_at DESC LIMIT 10` : [];
       return new Response(JSON.stringify(data), { 
@@ -56,7 +60,7 @@ Deno.serve({ port: PORT }, async (req) => {
       });
     }
 
-    // --- ROUTE: / (Visual Dashboard) ---
+    // --- ROUTE 3: / (The Visual Dashboard for the Render URL) ---
     let dbStatus = "Checking...";
     let spinCount = "0";
 
@@ -93,6 +97,6 @@ Deno.serve({ port: PORT }, async (req) => {
       headers: { ...headers, "Content-Type": "application/json" } 
     });
   }
-}); // <--- THIS WAS THE MISSING LINE!
+});
 
 console.log(`🚀 Server live on port ${PORT}`);
