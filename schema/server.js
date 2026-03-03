@@ -11,7 +11,7 @@ async function initializeDatabase() {
   try {
     // Ensure table exists
     await sql`CREATE TABLE IF NOT EXISTS spins (id SERIAL PRIMARY KEY, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
-    // Ensure 'data' column exists (fixes the previous error)
+    // Ensure 'data' column exists
     await sql`ALTER TABLE spins ADD COLUMN IF NOT EXISTS data JSONB;`;
     console.log("✅ Database schema is ready.");
   } catch (err) {
@@ -25,7 +25,7 @@ const PORT = parseInt(Deno.env.get("PORT") || "10000");
 Deno.serve({ port: PORT }, async (req) => {
   const url = new URL(req.url);
 
-  // 2. Mandatory CORS Headers (Crucial for GitHub Pages communication)
+  // 2. Mandatory CORS Headers
   const headers = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -36,23 +36,31 @@ Deno.serve({ port: PORT }, async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers });
 
   try {
-    // --- ROUTE 1: POST /spin (Save new data from your button) ---
+    // --- ROUTE 1: POST /spin (Save data) ---
     if (url.pathname === "/spin" && req.method === "POST") {
-      const body = await req.json();
-      
-      // We insert the JSON object directly into the 'data' column
-      const result = await sql`
-        INSERT INTO spins (data) 
-        VALUES (${body}) 
-        RETURNING id, created_at
-      `;
-      
-      return new Response(JSON.stringify({ success: true, saved: result[0] }), { 
-        headers: { ...headers, "Content-Type": "application/json" } 
-      });
+      try {
+        const body = await req.json();
+        
+        // Use JSON.stringify to ensure Postgres sees a valid JSON string
+        const result = await sql`
+          INSERT INTO spins (data) 
+          VALUES (${JSON.stringify(body)}) 
+          RETURNING id, created_at
+        `;
+        
+        return new Response(JSON.stringify({ success: true, saved: result[0] }), { 
+          headers: { ...headers, "Content-Type": "application/json" } 
+        });
+      } catch (insertErr) {
+        console.error("Insert Error:", insertErr);
+        return new Response(JSON.stringify({ error: insertErr.message }), { 
+          status: 500, 
+          headers: { ...headers, "Content-Type": "application/json" } 
+        });
+      }
     }
 
-    // --- ROUTE 2: GET /data (Fetch records for the History Table) ---
+    // --- ROUTE 2: GET /data (Fetch history) ---
     if (url.pathname === "/data") {
       const data = sql ? await sql`SELECT * FROM spins ORDER BY created_at DESC LIMIT 10` : [];
       return new Response(JSON.stringify(data), { 
@@ -60,7 +68,7 @@ Deno.serve({ port: PORT }, async (req) => {
       });
     }
 
-    // --- ROUTE 3: / (The Visual Dashboard for the Render URL) ---
+    // --- ROUTE 3: / (Visual Dashboard) ---
     let dbStatus = "Checking...";
     let spinCount = "0";
 
@@ -91,7 +99,7 @@ Deno.serve({ port: PORT }, async (req) => {
     return new Response(html, { headers: { ...headers, "Content-Type": "text/html" } });
 
   } catch (err) {
-    console.error("Server Error:", err);
+    console.error("Global Server Error:", err);
     return new Response(JSON.stringify({ error: err.message }), { 
       status: 500, 
       headers: { ...headers, "Content-Type": "application/json" } 
