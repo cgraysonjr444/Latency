@@ -23,11 +23,57 @@
             border-radius: 12px; 
             border: 1px solid #333; 
             display: inline-block; 
-            min-width: 350px;
+            min-width: 380px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             margin-bottom: 20px;
         }
         
+        .search-box { margin-bottom: 20px; position: relative; }
+        input {
+            width: 90%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: #111;
+            color: white;
+            outline: none;
+        }
+        input:focus { border-color: var(--neon-green); }
+
+        #search-results {
+            background: #252525;
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            position: absolute;
+            width: 94%;
+            left: 3%;
+            z-index: 10;
+        }
+        .result-item {
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+            text-align: left;
+            font-size: 0.85rem;
+        }
+        .result-item:hover { background: #333; }
+        .result-item img { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; }
+
+        .selected-badge {
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border: 1px solid var(--neon-green);
+        }
+
         .status { margin: 12px 0; font-weight: 600; font-size: 1.1rem; }
         .green { color: var(--neon-green); }
         .red { color: #ff4444; }
@@ -51,9 +97,9 @@
         .btn-secondary:hover { background: #888; color: black; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th { border-bottom: 2px solid #333; padding: 12px; color: var(--neon-green); text-transform: uppercase; font-size: 0.8rem; }
-        td { padding: 12px; border-bottom: 1px solid #2a2a2a; font-size: 0.9rem; }
-        .timestamp { color: #666; }
+        th { border-bottom: 2px solid #333; padding: 12px; color: var(--neon-green); text-transform: uppercase; font-size: 0.75rem; }
+        td { padding: 12px; border-bottom: 1px solid #2a2a2a; font-size: 0.85rem; vertical-align: middle; }
+        .album-art { width: 45px; height: 45px; border-radius: 4px; background: #333; }
     </style>
 </head>
 <body>
@@ -62,8 +108,21 @@
     <p class="subtitle">Real-time RPM & Latency Tracking</p>
 
     <div class="box">
+        <div class="search-box">
+            <input type="text" id="album-input" placeholder="Search Discogs for an album..." autocomplete="off">
+            <div id="search-results"></div>
+        </div>
+
+        <div id="selected-display" style="display: none;" class="selected-badge">
+            <img id="sel-img" src="" class="album-art">
+            <div style="text-align: left;">
+                <div id="sel-title" style="font-weight: bold; font-size: 0.9rem;"></div>
+                <div style="font-size: 0.7rem; color: #888;">Selected for Spin</div>
+            </div>
+            <button onclick="clearSelection()" style="padding: 2px 8px; font-size: 0.7rem; border-color: #ff4444; color: #ff4444; margin-left: auto;">X</button>
+        </div>
+
         <div id="server-status" class="status">Checking Server...</div>
-        <div id="db-status" class="status" style="font-size: 0.9rem; opacity: 0.8;">Connecting to DB...</div>
         
         <div class="btn-group">
             <button id="spin-btn" onclick="sendTestSpin()">Log Test Spin 🚀</button>
@@ -71,134 +130,143 @@
         </div>
     </div>
 
-    <br>
-
-    <div class="box" style="width: 90%; max-width: 600px;">
+    <div class="box" style="width: 95%; max-width: 800px; display: block; margin: 20px auto;">
         <h3 style="margin-top: 0;">Recent Activity</h3>
         <table>
             <thead>
                 <tr>
-                    <th style="text-align: left;">Time</th>
+                    <th>Album</th>
                     <th style="text-align: center;">RPM</th>
-                    <th style="text-align: right;">Latency</th>
+                    <th style="text-align: center;">Latency</th>
+                    <th style="text-align: right;">Time</th>
                 </tr>
             </thead>
             <tbody id="history-body">
-                <tr><td colspan="3" style="color: #444; padding: 20px;">Loading history...</td></tr>
+                <tr><td colspan="4" style="color: #444; padding: 20px;">Loading history...</td></tr>
             </tbody>
         </table>
     </div>
 
     <script>
         const RENDER_URL = "https://latency-8zo5.onrender.com";
+        let selectedAlbum = null;
 
+        // --- DISCOGS SEARCH LOGIC ---
+        const albumInput = document.getElementById('album-input');
+        const searchResults = document.getElementById('search-results');
+
+        albumInput.addEventListener('input', async (e) => {
+            const q = e.target.value;
+            if (q.length < 3) { searchResults.innerHTML = ""; return; }
+
+            try {
+                const res = await fetch(`${RENDER_URL}/search-album?q=${encodeURIComponent(q)}`);
+                const items = await res.json();
+                
+                searchResults.innerHTML = items.map(item => `
+                    <div class="result-item" onclick="selectAlbum('${item.title.replace(/'/g, "\\'")}', '${item.thumb}')">
+                        <img src="${item.thumb || 'https://via.placeholder.com/40'}">
+                        <span>${item.title}</span>
+                    </div>
+                `).join('');
+            } catch (err) { console.error("Search failed", err); }
+        });
+
+        function selectAlbum(title, thumb) {
+            selectedAlbum = { title, thumb };
+            document.getElementById('selected-display').style.display = "flex";
+            document.getElementById('sel-img').src = thumb;
+            document.getElementById('sel-title').innerText = title;
+            searchResults.innerHTML = "";
+            albumInput.value = "";
+        }
+
+        function clearSelection() {
+            selectedAlbum = null;
+            document.getElementById('selected-display').style.display = "none";
+        }
+
+        // --- CORE FUNCTIONALITY ---
         async function updateDashboard() {
             const statusEl = document.getElementById('server-status');
-            const dbStatusEl = document.getElementById('db-status');
             const historyBody = document.getElementById('history-body');
 
             try {
                 const response = await fetch(`${RENDER_URL}/data`);
-                if (!response.ok) throw new Error("Offline");
-
                 const data = await response.json();
                 
                 statusEl.innerText = "Result: Server Online ✅";
                 statusEl.className = "status green";
-                dbStatusEl.innerText = `Database Connected: ${data.length} records found`;
 
-                historyBody.innerHTML = "";
-                if (data.length === 0) {
-                    historyBody.innerHTML = '<tr><td colspan="3" style="padding:20px; color:#666;">No data yet. Press "Log Test Spin"!</td></tr>';
-                } else {
-                    data.forEach(row => {
-                        const tr = document.createElement('tr');
-                        const time = new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                        const rpm = row.data?.rpm || "--";
-                        const lat = row.data?.latency || "--";
+                historyBody.innerHTML = data.length ? "" : '<tr><td colspan="4">No data yet.</td></tr>';
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    const time = new Date(row.created_at).toLocaleTimeString();
+                    const albumTitle = row.data?.album?.title || "Unknown Album";
+                    const albumThumb = row.data?.album?.thumb || "https://via.placeholder.com/45";
 
-                        tr.innerHTML = `
-                            <td style="text-align: left;" class="timestamp">${time}</td>
-                            <td style="text-align: center;">${rpm}</td>
-                            <td style="text-align: right;" class="green">${lat}ms</td>
-                        `;
-                        historyBody.appendChild(tr);
-                    });
-                }
+                    tr.innerHTML = `
+                        <td style="display: flex; align-items: center; gap: 10px; border: none;">
+                            <img src="${albumThumb}" class="album-art">
+                            <span style="font-weight: bold; text-align: left;">${albumTitle}</span>
+                        </td>
+                        <td style="text-align: center;">${row.data?.rpm || "--"}</td>
+                        <td style="text-align: center;" class="green">${row.data?.latency || "--"}ms</td>
+                        <td style="text-align: right; color: #555;">${time}</td>
+                    `;
+                    historyBody.appendChild(tr);
+                });
             } catch (err) {
                 statusEl.innerText = "Result: Server Offline ❌";
                 statusEl.className = "status red";
-                dbStatusEl.innerText = "Verify Render Service is active.";
             }
         }
 
         async function sendTestSpin() {
             const btn = document.getElementById('spin-btn');
-            btn.innerText = "Sending...";
             btn.disabled = true;
 
             try {
-                const fakeData = {
+                const payload = {
                     rpm: (Math.random() * (33.4 - 33.2) + 33.2).toFixed(2),
-                    latency: Math.floor(Math.random() * 50) + 10
+                    latency: Math.floor(Math.random() * 50) + 10,
+                    album: selectedAlbum || { title: "Generic Spin", thumb: "" }
                 };
 
-                const response = await fetch(`${RENDER_URL}/spin`, {
+                await fetch(`${RENDER_URL}/spin`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(fakeData)
+                    body: JSON.stringify(payload)
                 });
 
-                if (response.ok) {
-                    await updateDashboard();
-                } else {
-                    const errorMsg = await response.text();
-                    console.error("Server Error:", errorMsg);
-                    alert("Server error. Check console/logs.");
-                }
+                clearSelection();
+                await updateDashboard();
             } catch (err) {
-                alert("Failed to connect to server.");
+                alert("Failed to save spin.");
             } finally {
-                btn.innerText = "Log Test Spin 🚀";
                 btn.disabled = false;
             }
         }
 
         async function downloadCSV() {
-            try {
-                const response = await fetch(`${RENDER_URL}/data`);
-                const data = await response.json();
-                
-                if (!data || data.length === 0) {
-                    alert("No data available to export!");
-                    return;
-                }
+            const res = await fetch(`${RENDER_URL}/data`);
+            const data = await res.json();
+            if (!data.length) return alert("No data!");
 
-                let csvContent = "data:text/csv;charset=utf-8,ID,Timestamp,RPM,Latency_ms\n";
+            let csv = "Timestamp,Album,RPM,Latency\n";
+            data.forEach(r => {
+                csv += `${r.created_at},"${r.data.album?.title || 'N/A'}",${r.data.rpm},${r.data.latency}\n`;
+            });
 
-                data.forEach(row => {
-                    const id = row.id;
-                    const time = new Date(row.created_at).toISOString();
-                    const rpm = row.data?.rpm || "0";
-                    const lat = row.data?.latency || "0";
-                    csvContent += `${id},${time},${rpm},${lat}\n`;
-                });
-
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", "vinyl_pulse_data.csv");
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } catch (err) {
-                alert("Export failed. See console.");
-            }
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'vinyl_pulse_history.csv';
+            a.click();
         }
 
         window.addEventListener('DOMContentLoaded', updateDashboard);
-        setInterval(updateDashboard, 30000);
     </script>
 </body>
-</html>
 </html>
