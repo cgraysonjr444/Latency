@@ -6,17 +6,15 @@ const sql = databaseUrl
   ? postgres(databaseUrl, { ssl: { rejectUnauthorized: false }, connect_timeout: 10 }) 
   : null;
 
-// Ensure table and columns exist on startup (WITHOUT deleting existing data)
+// Ensure table and columns exist on startup
 async function initializeDatabase() {
   if (!sql) return;
   try {
-    // We removed the DROP TABLE line to protect your logged data
     await sql`CREATE TABLE IF NOT EXISTS spins (
       id SERIAL PRIMARY KEY, 
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
       data JSONB
     );`;
-    
     console.log("✅ Database is live and data is protected.");
   } catch (err) {
     console.error("❌ Database init error:", err);
@@ -44,14 +42,11 @@ Deno.serve({ port: PORT }, async (req) => {
     if (url.pathname === "/spin" && req.method === "POST") {
       try {
         const body = await req.json();
-        
-        // Use the library's built-in json helper for stable storage
         const result = await sql`
           INSERT INTO spins (data) 
           VALUES (${ sql.json(body) }) 
           RETURNING id, created_at
         `;
-        
         return new Response(JSON.stringify({ success: true, saved: result[0] }), { 
           headers: { ...headers, "Content-Type": "application/json" } 
         });
@@ -72,7 +67,35 @@ Deno.serve({ port: PORT }, async (req) => {
       });
     }
 
-    // --- ROUTE 3: / (Visual Dashboard) ---
+    // --- ROUTE 3: GET /search-album (Discogs Proxy) ---
+    if (url.pathname === "/search-album" && req.method === "GET") {
+      const query = url.searchParams.get("q");
+      const discogsToken = Deno.env.get("DISCOGS_TOKEN");
+
+      if (!query) return new Response("Missing query", { status: 400, headers });
+      if (!discogsToken) return new Response("Discogs Token not configured", { status: 500, headers });
+
+      try {
+        const response = await fetch(
+          `https://api.discogs.com/database/search?q=${encodeURIComponent(query)}&type=release&per_page=5`, 
+          {
+            headers: {
+              "Authorization": `Discogs token=${discogsToken}`,
+              "User-Agent": "VinylPulse/1.0"
+            }
+          }
+        );
+
+        const data = await response.json();
+        return new Response(JSON.stringify(data.results || []), { 
+          headers: { ...headers, "Content-Type": "application/json" } 
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
+      }
+    }
+
+    // --- ROUTE 4: / (Visual Dashboard) ---
     let dbStatus = "Checking...";
     let spinCount = "0";
 
