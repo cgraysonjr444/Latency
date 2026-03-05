@@ -6,22 +6,18 @@ const sql = databaseUrl
   ? postgres(databaseUrl, { ssl: { rejectUnauthorized: false }, connect_timeout: 10 }) 
   : null;
 
-// Ensure table and columns exist on startup
+// Ensure table and columns exist on startup (WITHOUT deleting existing data)
 async function initializeDatabase() {
   if (!sql) return;
   try {
-    // --- TEMPORARY RESET LINE ---
-    // This wipes the old table so we can fix the 'data' column issue
-    await sql`DROP TABLE IF EXISTS spins;`; 
-    
-    // Create the fresh table with the correct JSONB column
-    await sql`CREATE TABLE spins (
+    // We removed the DROP TABLE line to protect your logged data
+    await sql`CREATE TABLE IF NOT EXISTS spins (
       id SERIAL PRIMARY KEY, 
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
       data JSONB
     );`;
     
-    console.log("✅ Database factory reset complete. Schema is ready.");
+    console.log("✅ Database is live and data is protected.");
   } catch (err) {
     console.error("❌ Database init error:", err);
   }
@@ -49,7 +45,7 @@ Deno.serve({ port: PORT }, async (req) => {
       try {
         const body = await req.json();
         
-        // Use sql.json() to ensure the object is stored correctly in JSONB
+        // Use the library's built-in json helper for stable storage
         const result = await sql`
           INSERT INTO spins (data) 
           VALUES (${ sql.json(body) }) 
