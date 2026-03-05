@@ -10,9 +10,18 @@ const sql = databaseUrl
 async function initializeDatabase() {
   if (!sql) return;
   try {
-    await sql`CREATE TABLE IF NOT EXISTS spins (id SERIAL PRIMARY KEY, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
-    await sql`ALTER TABLE spins ADD COLUMN IF NOT EXISTS data JSONB;`;
-    console.log("✅ Database schema is ready.");
+    // --- TEMPORARY RESET LINE ---
+    // This wipes the old table so we can fix the 'data' column issue
+    await sql`DROP TABLE IF EXISTS spins;`; 
+    
+    // Create the fresh table with the correct JSONB column
+    await sql`CREATE TABLE spins (
+      id SERIAL PRIMARY KEY, 
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+      data JSONB
+    );`;
+    
+    console.log("✅ Database factory reset complete. Schema is ready.");
   } catch (err) {
     console.error("❌ Database init error:", err);
   }
@@ -40,7 +49,7 @@ Deno.serve({ port: PORT }, async (req) => {
       try {
         const body = await req.json();
         
-        // Use the library's built-in json helper to fix the 500 error
+        // Use sql.json() to ensure the object is stored correctly in JSONB
         const result = await sql`
           INSERT INTO spins (data) 
           VALUES (${ sql.json(body) }) 
