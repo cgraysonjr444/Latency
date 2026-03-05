@@ -23,7 +23,7 @@
             border-radius: 12px; 
             border: 1px solid #333; 
             display: inline-block; 
-            min-width: 320px;
+            min-width: 350px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             margin-bottom: 20px;
         }
@@ -32,18 +32,23 @@
         .green { color: var(--neon-green); }
         .red { color: #ff4444; }
         
+        .btn-group { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+        
         button {
             background: transparent;
             border: 1px solid var(--neon-green);
             color: var(--neon-green);
-            padding: 10px 20px;
+            padding: 10px 18px;
             border-radius: 5px;
             cursor: pointer;
             font-weight: bold;
             transition: 0.3s;
-            margin-top: 10px;
         }
         button:hover { background: var(--neon-green); color: black; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-secondary { border-color: #888; color: #888; }
+        .btn-secondary:hover { background: #888; color: black; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th { border-bottom: 2px solid #333; padding: 12px; color: var(--neon-green); text-transform: uppercase; font-size: 0.8rem; }
@@ -60,7 +65,10 @@
         <div id="server-status" class="status">Checking Server...</div>
         <div id="db-status" class="status" style="font-size: 0.9rem; opacity: 0.8;">Connecting to DB...</div>
         
-        <button onclick="sendTestSpin()">Log Test Spin 🚀</button>
+        <div class="btn-group">
+            <button id="spin-btn" onclick="sendTestSpin()">Log Test Spin 🚀</button>
+            <button class="btn-secondary" onclick="downloadCSV()">Export CSV 📊</button>
+        </div>
     </div>
 
     <br>
@@ -95,12 +103,10 @@
 
                 const data = await response.json();
                 
-                // Update Status
                 statusEl.innerText = "Result: Server Online ✅";
                 statusEl.className = "status green";
                 dbStatusEl.innerText = `Database Connected: ${data.length} records found`;
 
-                // Update Table
                 historyBody.innerHTML = "";
                 if (data.length === 0) {
                     historyBody.innerHTML = '<tr><td colspan="3" style="padding:20px; color:#666;">No data yet. Press "Log Test Spin"!</td></tr>';
@@ -108,8 +114,6 @@
                     data.forEach(row => {
                         const tr = document.createElement('tr');
                         const time = new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                        
-                        // Extracting values from the JSONB 'data' column
                         const rpm = row.data?.rpm || "--";
                         const lat = row.data?.latency || "--";
 
@@ -129,14 +133,14 @@
         }
 
         async function sendTestSpin() {
-            const btn = event.target;
+            const btn = document.getElementById('spin-btn');
             btn.innerText = "Sending...";
             btn.disabled = true;
 
             try {
                 const fakeData = {
-                    rpm: (Math.random() * (33.4 - 33.2) + 33.2).toFixed(2), // Random RPM near 33.3
-                    latency: Math.floor(Math.random() * 50) + 10 // Random latency 10-60ms
+                    rpm: (Math.random() * (33.4 - 33.2) + 33.2).toFixed(2),
+                    latency: Math.floor(Math.random() * 50) + 10
                 };
 
                 const response = await fetch(`${RENDER_URL}/spin`, {
@@ -146,22 +150,55 @@
                 });
 
                 if (response.ok) {
-                    console.log("Spin logged successfully!");
-                    await updateDashboard(); // Refresh table immediately
+                    await updateDashboard();
+                } else {
+                    const errorMsg = await response.text();
+                    console.error("Server Error:", errorMsg);
+                    alert("Server error. Check console/logs.");
                 }
             } catch (err) {
-                alert("Failed to log spin. Is the server awake?");
+                alert("Failed to connect to server.");
             } finally {
                 btn.innerText = "Log Test Spin 🚀";
                 btn.disabled = false;
             }
         }
 
-        // Initial Load
+        async function downloadCSV() {
+            try {
+                const response = await fetch(`${RENDER_URL}/data`);
+                const data = await response.json();
+                
+                if (!data || data.length === 0) {
+                    alert("No data available to export!");
+                    return;
+                }
+
+                let csvContent = "data:text/csv;charset=utf-8,ID,Timestamp,RPM,Latency_ms\n";
+
+                data.forEach(row => {
+                    const id = row.id;
+                    const time = new Date(row.created_at).toISOString();
+                    const rpm = row.data?.rpm || "0";
+                    const lat = row.data?.latency || "0";
+                    csvContent += `${id},${time},${rpm},${lat}\n`;
+                });
+
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "vinyl_pulse_data.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (err) {
+                alert("Export failed. See console.");
+            }
+        }
+
         window.addEventListener('DOMContentLoaded', updateDashboard);
-        
-        // Auto-refresh every 30 seconds
         setInterval(updateDashboard, 30000);
     </script>
 </body>
+</html>
 </html>
