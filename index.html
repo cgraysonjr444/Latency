@@ -10,8 +10,7 @@
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: white; text-align: center; margin: 0; padding: 10px; }
         .box { background: var(--card); padding: 15px; border-radius: 20px; border: 1px solid #333; max-width: 450px; margin: 0 auto; }
         
-        /* Chart Container */
-        .chart-container { background: #000; padding: 10px; border-radius: 15px; margin: 15px 0; border: 1px solid #222; height: 220px; }
+        .chart-container { background: #000; padding: 10px; border-radius: 15px; margin: 15px 0; border: 1px solid #222; height: 220px; position: relative; }
         
         .vitals { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
         .v-card { background: #111; padding: 10px; border-radius: 12px; border: 1px solid #222; }
@@ -22,37 +21,29 @@
         #album-preview { width: 80px; height: 80px; border-radius: 8px; border: 2px solid var(--primary); object-fit: cover; }
         
         input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #444; background: #111; color: white; box-sizing: border-box; margin-bottom: 10px; font-size: 1rem; }
-        button#main-btn { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid var(--primary); background: transparent; color: var(--primary); font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button#main-btn:active { background: var(--primary); color: #000; }
+        button#main-btn { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid var(--primary); background: transparent; color: var(--primary); font-weight: bold; cursor: pointer; }
         
         .history { margin-top: 20px; text-align: left; max-width: 450px; margin: 20px auto; }
         .log { display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid #222; font-size: 0.85rem; }
         .log-img { width: 45px; height: 45px; border-radius: 6px; background: #333; object-fit: cover; }
-        .am-link { font-size: 0.75rem; color: var(--primary); text-decoration: none; display: inline-block; margin-top: 5px; border: 1px solid #333; padding: 2px 8px; border-radius: 10px; }
+        .am-link { font-size: 0.7rem; color: var(--primary); text-decoration: none; display: inline-block; margin-top: 5px; border: 1px solid #444; padding: 2px 8px; border-radius: 10px; }
         .btn-s { text-decoration: none; color: #888; border: 1px solid #444; padding: 8px; border-radius: 15px; font-size: 0.7rem; display: block; margin-bottom: 10px; }
     </style>
 </head>
 <body>
     <h1>VINYL PULSE 💿</h1>
-    
     <div class="box">
-        <a href="/auth/google" class="btn-s">Sync Google Health 🏃</a>
-
-        <div class="chart-container">
-            <canvas id="pulseChart"></canvas>
-        </div>
-
+        <a href="/auth/google" class="btn-s">Sync Health 🏃</a>
+        <div class="chart-container"><canvas id="pulseChart"></canvas></div>
         <div class="vitals">
             <div class="v-card"><div class="v-val" id="hr">--</div><div style="font-size:0.6rem;color:#888">BPM (HEART)</div></div>
             <div class="v-card"><div class="v-val rpm-text" id="rpm-display">33.30</div><div style="font-size:0.6rem;color:#888">RPM (LATENCY)</div></div>
         </div>
-
         <div id="preview-container"><img id="album-preview" src=""></div>
         <input type="text" id="search" placeholder="Search Album + Enter" autocomplete="off">
         <div id="status" style="font-size: 0.7rem; margin-bottom: 10px; color: #555;">Ready</div>
         <button id="main-btn" onclick="logSession()">LOG PERFORMANCE 🚀</button>
     </div>
-
     <div class="history" id="history"></div>
 
     <script>
@@ -61,51 +52,42 @@
         let myChart = null;
 
         const params = new URLSearchParams(window.location.search);
-        const currentUser = params.get('user') || localStorage.getItem('vp_user') || "guest";
+        const currentUser = params.get('user') || localStorage.getItem('vp_user') || "guest_user";
         if (params.get('user')) localStorage.setItem('vp_user', params.get('user'));
 
         document.getElementById('search').addEventListener('keypress', async (e) => {
             if (e.key === 'Enter') {
                 document.getElementById('status').innerText = "Searching...";
-                try {
-                    const res = await fetch(`${RENDER_URL}/search-album?q=${encodeURIComponent(e.target.value)}`);
-                    const data = await res.json();
-                    if (data.length > 0) {
-                        e.target.value = data[0].title;
-                        lastThumb = data[0].thumb;
-                        document.getElementById('album-preview').src = lastThumb;
-                        document.getElementById('preview-container').style.display = 'block';
-                        document.getElementById('status').innerText = "Match Found!";
-                    }
-                } catch(err) { document.getElementById('status').innerText = "Discogs Error"; }
+                const res = await fetch(`${RENDER_URL}/search-album?q=${encodeURIComponent(e.target.value)}`);
+                const data = await res.json();
+                if (data.length > 0) {
+                    e.target.value = data[0].title;
+                    lastThumb = data[0].thumb;
+                    document.getElementById('album-preview').src = lastThumb;
+                    document.getElementById('preview-container').style.display = 'block';
+                    document.getElementById('status').innerText = "Album Found! 💿";
+                }
             }
         });
 
         async function logSession() {
             const albumName = document.getElementById('search').value;
             if (!albumName) return;
-
-            const currentHR = document.getElementById('hr').innerText;
-            const simulatedRPM = (33.3 + (Math.random() * 0.08 - 0.04)).toFixed(2);
-            
             const payload = {
                 user_email: currentUser,
                 album: albumName,
                 thumb: lastThumb,
-                hr: currentHR === "--" ? Math.floor(72 + Math.random() * 10) : parseInt(currentHR),
-                rpm: simulatedRPM,
+                hr: document.getElementById('hr').innerText === "--" ? 72 : parseInt(document.getElementById('hr').innerText),
+                rpm: (33.3 + (Math.random() * 0.04 - 0.02)).toFixed(2),
                 timestamp: new Date().toISOString()
             };
-
             await fetch(`${RENDER_URL}/spin`, { 
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload) 
             });
-            
-            document.getElementById('preview-container').style.display = 'none';
             document.getElementById('search').value = "";
-            lastThumb = "";
+            document.getElementById('preview-container').style.display = 'none';
             loadHistory();
         }
 
@@ -115,73 +97,47 @@
             
             document.getElementById('history').innerHTML = data.map(i => {
                 const d = i.data || {};
-                const albumTitle = d.album || "Unknown Spin";
-                const appleLink = `https://music.apple.com/search?term=${encodeURIComponent(albumTitle)}`;
-                
+                const amUrl = `https://music.apple.com/search?term=${encodeURIComponent(d.album || "Unknown")}`;
                 return `
                     <div class="log">
                         <img class="log-img" src="${d.thumb || ''}" onerror="this.src='https://via.placeholder.com/45'">
                         <div style="flex:1">
-                            <strong>${albumTitle}</strong><br>
+                            <strong>${d.album || "Unknown"}</strong><br>
                             <span style="font-size:0.7rem; color:var(--primary)">${d.hr} BPM</span> | 
                             <span style="font-size:0.7rem; color:var(--latency)">${d.rpm} RPM</span><br>
-                            <a href="${appleLink}" target="_blank" class="am-link">Listen on Apple Music 🎵</a>
+                            <a href="${amUrl}" target="_blank" class="am-link">Listen on Apple Music 🎵</a>
                         </div>
-                    </div>
-                `;
+                    </div>`;
             }).join('');
-
             updateChart(data.slice(0, 10).reverse());
         }
 
         function updateChart(recentData) {
             const ctx = document.getElementById('pulseChart').getContext('2d');
-            const labels = recentData.map((_, i) => i + 1);
-            const hrData = recentData.map(i => i.data.hr);
-            const rpmData = recentData.map(i => i.data.rpm);
+            const labels = recentData.length > 0 ? recentData.map((_, i) => i + 1) : [1, 2, 3, 4, 5];
+            const hrPoints = recentData.length > 0 ? recentData.map(i => i.data.hr) : [70, 72, 71, 74, 73];
+            const rpmPoints = recentData.length > 0 ? recentData.map(i => i.data.rpm) : [33.3, 33.32, 33.28, 33.31, 33.3];
 
             if (myChart) myChart.destroy();
-
             myChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
                     datasets: [
-                        {
-                            label: 'BPM',
-                            data: hrData,
-                            borderColor: '#00ffcc',
-                            backgroundColor: 'rgba(0, 255, 204, 0.1)',
-                            yAxisID: 'y',
-                            tension: 0.3,
-                            fill: true
-                        },
-                        {
-                            label: 'RPM',
-                            data: rpmData,
-                            borderColor: '#ff0077',
-                            yAxisID: 'y1',
-                            tension: 0.3,
-                            borderDash: [5, 5]
-                        }
+                        { label: 'BPM', data: hrPoints, borderColor: '#00ffcc', yAxisID: 'y', tension: 0.3, fill: false },
+                        { label: 'RPM', data: rpmPoints, borderColor: '#ff0077', yAxisID: 'y1', tension: 0.3, borderDash: [5, 5] }
                     ]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    responsive: true, maintainAspectRatio: false,
                     scales: {
-                        y: { position: 'left', grid: { color: '#222' }, title: { display: true, text: 'BPM', color: '#00ffcc', font: { size: 10 } } },
-                        y1: { position: 'right', grid: { display: false }, title: { display: true, text: 'RPM', color: '#ff0077', font: { size: 10 } } },
+                        y: { position: 'left', grid: { color: '#222' } },
+                        y1: { position: 'right', grid: { display: false } },
                         x: { display: false }
                     },
                     plugins: { legend: { display: false } }
                 }
             });
-        }
-
-        if (params.get('auth') === 'success') {
-            document.getElementById('hr').innerText = "74"; 
-            document.getElementById('status').innerText = `Sync Active: ${currentUser.split('@')[0]}`;
         }
 
         window.onload = loadHistory;
