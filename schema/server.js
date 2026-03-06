@@ -24,14 +24,14 @@ Deno.serve({ port: 10000 }, async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers });
 
   try {
-    // --- 0. SERVE THE FRONTEND (The fix for your "Path Ignored" error) ---
+    // --- 0. SERVE THE FRONTEND ---
     if (path === "" || path === "/") {
       try {
         const html = await Deno.readTextFile("./index.html");
         return new Response(html, { 
           headers: { ...headers, "Content-Type": "text/html" } 
         });
-      } catch (e) {
+      } catch (_e) { // Prefixed with underscore to pass Deno Lint
         return new Response("index.html not found in root directory.", { status: 404, headers });
       }
     }
@@ -53,7 +53,11 @@ Deno.serve({ port: 10000 }, async (req) => {
     if (path.includes("auth/callback")) {
       const code = url.searchParams.get("code") || "";
       const tParams = new URLSearchParams({
-        code, client_id: CLIENT_ID, client_secret: CLIENT_SECRET, redirect_uri: REDIRECT_URI, grant_type: "authorization_code"
+        code, 
+        client_id: CLIENT_ID, 
+        client_secret: CLIENT_SECRET, 
+        redirect_uri: REDIRECT_URI, 
+        grant_type: "authorization_code"
       });
 
       const tRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -65,7 +69,6 @@ Deno.serve({ port: 10000 }, async (req) => {
       const tokens = await tRes.json();
       console.log(tokens.access_token ? "Auth Success" : "Auth Failed");
 
-      // Send the user back to the UI with a success flag
       return Response.redirect("https://latency-8zo5.onrender.com/?auth=success", 302);
     }
 
