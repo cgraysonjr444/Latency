@@ -1,5 +1,6 @@
 import postgres from "https://deno.land/x/postgresjs@v3.3.3/mod.js";
 
+// --- CONFIGURATION & ENV VARS ---
 const databaseUrl = Deno.env.get("DATABASE_URL");
 const sql = databaseUrl ? postgres(databaseUrl, { ssl: { rejectUnauthorized: false } }) : null;
 
@@ -18,7 +19,7 @@ Deno.serve({ port: 10000 }, async (req) => {
   const url = new URL(req.url);
   const path = url.pathname.toLowerCase().replace(/\/$/, "");
 
-  console.log(`Incoming Request: ${req.method} | Path: ${path || "/"}`);
+  console.log(`Incoming: ${req.method} | Path: ${path || "/"}`);
 
   // Handle CORS Preflight
   if (req.method === "OPTIONS") return new Response(null, { headers });
@@ -31,22 +32,27 @@ Deno.serve({ port: 10000 }, async (req) => {
         return new Response(html, { 
           headers: { ...headers, "Content-Type": "text/html" } 
         });
-      } catch (_e) { // Prefixed with underscore to pass Deno Lint
-        return new Response("index.html not found in root directory.", { status: 404, headers });
+      } catch (_e) { // Linter-safe unused variable
+        return new Response("index.html not found.", { status: 404, headers });
       }
     }
 
-    // --- 1. GOOGLE AUTH START ---
+    // --- 1. GOOGLE AUTH START (The Redirect) ---
     if (path.includes("auth/google")) {
       const scopes = [
         "https://www.googleapis.com/auth/fitness.activity.read",
         "https://www.googleapis.com/auth/fitness.heart_rate.read"
       ].join(" ");
 
-      const googleUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(scopes)}&access_type=offline&prompt=consent`;
+      const googleUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+      googleUrl.searchParams.set("client_id", CLIENT_ID);
+      googleUrl.searchParams.set("redirect_uri", REDIRECT_URI);
+      googleUrl.searchParams.set("response_type", "code");
+      googleUrl.searchParams.set("scope", scopes);
+      googleUrl.searchParams.set("access_type", "offline");
+      googleUrl.searchParams.set("prompt", "consent");
       
-      console.log("Redirecting to Google OAuth...");
-      return Response.redirect(googleUrl, 302);
+      return Response.redirect(googleUrl.toString(), 302);
     }
 
     // --- 2. GOOGLE AUTH CALLBACK ---
@@ -69,13 +75,14 @@ Deno.serve({ port: 10000 }, async (req) => {
       const tokens = await tRes.json();
       console.log(tokens.access_token ? "Auth Success" : "Auth Failed");
 
+      // Redirect back to main page with success flag
       return Response.redirect("https://latency-8zo5.onrender.com/?auth=success", 302);
     }
 
-    // --- 3. LOG A SPIN / WORKOUT ---
+    // --- 3. LOG PERFORMANCE DATA ---
     if (path === "/spin" && req.method === "POST") {
       const body = await req.json();
-      if (!sql) throw new Error("DB Connection Missing");
+      if (!sql) throw new Error("Database not connected");
       const res = await sql`INSERT INTO spins (data) VALUES (${sql.json(body)}) RETURNING *`;
       return new Response(JSON.stringify(res[0]), { headers });
     }
@@ -98,7 +105,7 @@ Deno.serve({ port: 10000 }, async (req) => {
     }
 
     // --- 6. API FALLBACK ---
-    return new Response(`Vinyl Pulse API: Path [${path}] has no logic defined.`, { headers });
+    return new Response(`Vinyl Pulse API: ${path} ignored.`, { headers });
 
   } catch (err) {
     console.error("Server Error:", err.message);
