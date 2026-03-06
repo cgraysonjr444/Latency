@@ -100,6 +100,8 @@
         th { border-bottom: 2px solid #333; padding: 12px; color: var(--neon-green); text-transform: uppercase; font-size: 0.75rem; }
         td { padding: 12px; border-bottom: 1px solid #2a2a2a; font-size: 0.85rem; vertical-align: middle; }
         .album-art { width: 45px; height: 45px; border-radius: 4px; background: #333; }
+        .listen-link { font-size: 0.7rem; color: var(--neon-green); text-decoration: none; font-weight: bold; }
+        .listen-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -117,7 +119,7 @@
             <img id="sel-img" src="" class="album-art">
             <div style="text-align: left;">
                 <div id="sel-title" style="font-weight: bold; font-size: 0.9rem;"></div>
-                <div style="font-size: 0.7rem; color: #888;">Selected for Spin</div>
+                <div style="font-size: 0.7rem; color: #888;">Ready to Log</div>
             </div>
             <button onclick="clearSelection()" style="padding: 2px 8px; font-size: 0.7rem; border-color: #ff4444; color: #ff4444; margin-left: auto;">X</button>
         </div>
@@ -130,12 +132,12 @@
         </div>
     </div>
 
-    <div class="box" style="width: 95%; max-width: 800px; display: block; margin: 20px auto;">
+    <div class="box" style="width: 95%; max-width: 850px; display: block; margin: 20px auto;">
         <h3 style="margin-top: 0;">Recent Activity</h3>
         <table>
             <thead>
                 <tr>
-                    <th>Album</th>
+                    <th style="text-align: left;">Album & Link</th>
                     <th style="text-align: center;">RPM</th>
                     <th style="text-align: center;">Latency</th>
                     <th style="text-align: right;">Time</th>
@@ -151,10 +153,10 @@
         const RENDER_URL = "https://latency-8zo5.onrender.com";
         let selectedAlbum = null;
 
-        // --- DISCOGS SEARCH LOGIC ---
         const albumInput = document.getElementById('album-input');
         const searchResults = document.getElementById('search-results');
 
+        // Search Discogs via your Render Bridge
         albumInput.addEventListener('input', async (e) => {
             const q = e.target.value;
             if (q.length < 3) { searchResults.innerHTML = ""; return; }
@@ -186,7 +188,6 @@
             document.getElementById('selected-display').style.display = "none";
         }
 
-        // --- CORE FUNCTIONALITY ---
         async function updateDashboard() {
             const statusEl = document.getElementById('server-status');
             const historyBody = document.getElementById('history-body');
@@ -201,18 +202,24 @@
                 historyBody.innerHTML = data.length ? "" : '<tr><td colspan="4">No data yet.</td></tr>';
                 data.forEach(row => {
                     const tr = document.createElement('tr');
-                    const time = new Date(row.created_at).toLocaleTimeString();
+                    const time = new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     const albumTitle = row.data?.album?.title || "Unknown Album";
                     const albumThumb = row.data?.album?.thumb || "https://via.placeholder.com/45";
+                    
+                    // Generate Apple Music Search Link
+                    const amLink = `https://music.apple.com/search?term=${encodeURIComponent(albumTitle)}`;
 
                     tr.innerHTML = `
-                        <td style="display: flex; align-items: center; gap: 10px; border: none;">
+                        <td style="display: flex; align-items: center; gap: 12px; border: none;">
                             <img src="${albumThumb}" class="album-art">
-                            <span style="font-weight: bold; text-align: left;">${albumTitle}</span>
+                            <div style="text-align: left;">
+                                <div style="font-weight: bold; font-size: 0.9rem;">${albumTitle}</div>
+                                <a href="${amLink}" target="_blank" class="listen-link">▶ Listen on Apple Music</a>
+                            </div>
                         </td>
                         <td style="text-align: center;">${row.data?.rpm || "--"}</td>
                         <td style="text-align: center;" class="green">${row.data?.latency || "--"}ms</td>
-                        <td style="text-align: right; color: #555;">${time}</td>
+                        <td style="text-align: right; color: #555; font-size: 0.75rem;">${time}</td>
                     `;
                     historyBody.appendChild(tr);
                 });
@@ -267,6 +274,7 @@
         }
 
         window.addEventListener('DOMContentLoaded', updateDashboard);
+        setInterval(updateDashboard, 60000); // Auto-refresh every minute
     </script>
 </body>
 </html>
