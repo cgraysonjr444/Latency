@@ -25,10 +25,10 @@
     </style>
 </head>
 <body>
-    <h1 id="header">VINYL PULSE 💿</h1>
+    <h1>VINYL PULSE 💿</h1>
     <div class="box">
         <div class="btn-row">
-            <button class="btn-s" id="w-btn" onclick="toggleWorkout()">Workout Hub 🔥</button>
+            <button class="btn-s" onclick="toggleWorkout()">Workout Hub 🔥</button>
             <a href="/auth/google" class="btn-s">Sync Health 🏃</a>
         </div>
         <div class="vitals" id="vitals">
@@ -36,12 +36,11 @@
             <div class="v-card"><div class="v-val" id="cal">--</div><div style="font-size:0.6rem;color:#888">CAL</div></div>
         </div>
         <video id="video-feed" autoplay playsinline></video>
-        <input type="text" id="search" placeholder="Search Discogs...">
+        <input type="text" id="search" placeholder="Search Album + Enter">
         <div id="status" style="font-size: 0.7rem; margin: 10px; color: #555;">Ready</div>
         <button id="main-btn" onclick="logSession()">LOG PERFORMANCE 🚀</button>
     </div>
     <div class="history" id="history"></div>
-    <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
         const RENDER_URL = "https://latency-8zo5.onrender.com";
@@ -53,53 +52,72 @@
             document.body.classList.toggle('workout-mode');
             document.getElementById('vitals').style.display = isWorkout ? 'grid' : 'none';
             document.getElementById('video-feed').style.display = isWorkout ? 'block' : 'none';
-            if (isWorkout) startCam();
-        }
-
-        async function startCam() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            document.getElementById('video-feed').srcObject = stream;
+            if (isWorkout) {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                document.getElementById('video-feed').srcObject = stream;
+            }
         }
 
         document.getElementById('search').addEventListener('keypress', async (e) => {
             if (e.key === 'Enter') {
+                document.getElementById('status').innerText = "Searching...";
                 const res = await fetch(`${RENDER_URL}/search-album?q=${encodeURIComponent(e.target.value)}`);
                 const data = await res.json();
-                if (data.length > 0) {
+                if (data && data.length > 0) {
                     e.target.value = data[0].title;
                     lastThumb = data[0].thumb;
-                    document.getElementById('status').innerText = "Album Found 💿";
+                    document.getElementById('status').innerText = "Album Found! 💿";
+                } else {
+                    document.getElementById('status').innerText = "Not found on Discogs";
                 }
             }
         });
 
         async function logSession() {
+            const albumName = document.getElementById('search').value || "Unknown Spin";
             const payload = {
-                album: document.getElementById('search').value || "Unknown Spin",
+                album: albumName,
                 thumb: lastThumb,
                 rpm: (33.3 + Math.random() * 0.05).toFixed(2),
                 mode: isWorkout ? 'workout' : 'standard'
             };
-            await fetch(`${RENDER_URL}/spin`, { method: 'POST', body: JSON.stringify(payload) });
+            await fetch(`${RENDER_URL}/spin`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload) 
+            });
+            document.getElementById('search').value = "";
+            lastThumb = "";
             loadHistory();
         }
 
         async function loadHistory() {
-            const res = await fetch(`${RENDER_URL}/data`);
-            const data = await res.json();
-            document.getElementById('history').innerHTML = data.map(i => `
-                <div class="log">
-                    <img class="log-img" src="${i.data.thumb || 'https://via.placeholder.com/50'}">
-                    <div class="log-info">
-                        <div style="font-weight:bold">${i.data.album}</div>
-                        <a class="am-link" href="https://music.apple.com/search?term=${encodeURIComponent(i.data.album)}" target="_blank">Listen on Apple Music 🎵</a>
-                    </div>
-                </div>
-            `).join('');
+            try {
+                const res = await fetch(`${RENDER_URL}/data`);
+                const data = await res.json();
+                document.getElementById('history').innerHTML = data.map(i => {
+                    const d = i.data || {};
+                    // Handle [object Object] bug: extract string name if nested
+                    let name = typeof d.album === 'string' ? d.album : (d.album?.title || "Unknown Spin");
+                    if (name === "[object Object]") name = "Unknown Spin";
+                    
+                    const img = d.thumb || 'https://via.placeholder.com/50';
+                    const amLink = `https://music.apple.com/search?term=${encodeURIComponent(name)}`;
+                    
+                    return `
+                        <div class="log">
+                            <img class="log-img" src="${img}">
+                            <div class="log-info">
+                                <div style="font-weight:bold">${name}</div>
+                                <a class="am-link" href="${amLink}" target="_blank">Listen on Apple Music 🎵</a>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) { console.error(e); }
         }
 
         if (window.location.search.includes('auth=success')) {
-            alert("Health Synced!");
             document.getElementById('hr').innerText = "78"; 
         }
 
