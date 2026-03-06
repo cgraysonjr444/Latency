@@ -6,6 +6,7 @@ const sql = databaseUrl ? postgres(databaseUrl, { ssl: { rejectUnauthorized: fal
 const CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
 const REDIRECT_URI = "https://latency-8zo5.onrender.com/auth/callback";
+const DISCOGS_TOKEN = Deno.env.get("DISCOGS_TOKEN") || "";
 
 const headers = {
   "Access-Control-Allow-Origin": "*",
@@ -15,41 +16,15 @@ const headers = {
 
 Deno.serve({ port: parseInt(Deno.env.get("PORT") || "10000") }, async (req) => {
   const url = new URL(req.url);
-  const path = url.pathname.replace(/\/$/, ""); // Removes trailing slash for better matching
+  const path = url.pathname.toLowerCase().replace(/\/$/, ""); 
 
-  console.log(`Incoming Request: ${req.method} ${path}`); // This will show up in your Render Logs!
+  console.log(`REQ: ${req.method} | PATH: ${path}`);
 
   if (req.method === "OPTIONS") return new Response(null, { headers });
 
   try {
-    // 1. --- LOG A PERFORMANCE ---
-    if (path === "/spin" && req.method === "POST") {
-      const body = await req.json();
-      const res = await sql`INSERT INTO spins (data) VALUES (${sql.json(body)}) RETURNING *`;
-      return new Response(JSON.stringify(res[0]), { headers });
-    }
-
-    // 2. --- GET HISTORY ---
-    if (path === "/data") {
-      const data = await sql`SELECT * FROM spins ORDER BY created_at DESC LIMIT 20`;
-      return new Response(JSON.stringify(data), { headers });
-    }
-
-    // 3. --- DISCOGS SEARCH ---
-    if (path === "/search-album") {
-      const q = url.searchParams.get("q") || "";
-      const dRes = await fetch(`https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release&per_page=5`, {
-        headers: { "Authorization": `Discogs token=${Deno.env.get("DISCOGS_TOKEN")}`, "User-Agent": "VinylPulse/1.1" }
-      });
-      const dData = await dRes.json();
-      return new Response(JSON.stringify(dData.results || []), { headers });
-    }
-
-    // 4. --- GOOGLE AUTH: THE REDIRECT (CRITICAL FIX) ---
-    // We use .includes or .startsWith to ensure it catches the route
+    // --- 1. GOOGLE AUTH START (PRIORITY ROUTE) ---
     if (path.includes("/auth/google")) {
-      console.log("MATCHED: /auth/google - Starting Redirect...");
-      
       const scopes = [
         "https://www.googleapis.com/auth/fitness.activity.read",
         "https://www.googleapis.com/auth/fitness.heart_rate.read"
@@ -60,7 +35,7 @@ Deno.serve({ port: parseInt(Deno.env.get("PORT") || "10000") }, async (req) => {
       return Response.redirect(googleUrl, 302);
     }
 
-    // 5. --- GOOGLE AUTH: CALLBACK ---
+    // --- 2. GOOGLE AUTH CALLBACK ---
     if (path.includes("/auth/callback")) {
       const code = url.searchParams.get("code") || "";
       const tParams = new URLSearchParams({
@@ -74,22 +49,46 @@ Deno.serve({ port: parseInt(Deno.env.get("PORT") || "10000") }, async (req) => {
       });
       
       const tokens = await tRes.json();
-      console.log("Tokens Received:", tokens.access_token ? "YES" : "NO");
+      console.log("Sync Status:", tokens.access_token ? "Tokens Received" : "Auth Failed");
 
       return Response.redirect("https://latency-8zo5.onrender.com/?auth=success", 302);
     }
 
-    // --- DEFAULT FALLBACK (What you were seeing) ---
+    // --- 3. SPIN LOGGING ---
+    if (path === "/spin" && req.method === "POST") {
+      const body = await req.json();
+      const res = await sql`INSERT INTO spins (data) VALUES (${sql.json(body)}) RETURNING *`;
+      return new Response(JSON.stringify(res[0]), { headers });
+    }
+
+    // --- 4. GET HISTORY ---
+    if (path === "/data") {
+      const data = await sql`SELECT * FROM spins ORDER BY created_at DESC LIMIT 20`;
+      return new Response(JSON.stringify(data), { headers });
+    }
+
+    // --- 5. DISCOGS SEARCH ---
+    if (path === "/search-album") {
+      const q = url.searchParams.get("q") || "";
+      const dRes = await fetch(`https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release&per_page=5`, {
+        headers: { "Authorization": `Discogs token=${DISCOGS_TOKEN}`, "User-Agent": "VinylPulse/1.1" }
+      });
+      const dData = await dRes.json();
+      return new Response(JSON.stringify(dData.results || []), { headers });
+    }
+
+    // --- 6. DEFAULT STATUS PAGE ---
     const stats = await sql`SELECT count(*) FROM spins`;
     return new Response(`
-      💿 Latency Service Online
-      -------------------------
+      💿 VINYL PULSE API
+      ------------------
+      Status: ONLINE
       Database: ✅ Connected
-      Spins Recorded: ${stats[0].count}
-      Current Path: ${path}
+      Logs: ${stats[0].count}
+      Debug Path: ${path}
     `, { headers: { ...headers, "Content-Type": "text/plain" } });
 
   } catch (err) {
-    return new Response(`Error: ${err.message}`, { status: 500, headers });
+    return new Response(`Server Error: ${err.message}`, { status: 500, headers });
   }
 });
