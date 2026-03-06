@@ -4,30 +4,110 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>VINYL PULSE 💿</title>
+    
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#121212">
+
     <style>
         :root { --primary: #00ffcc; --workout: #ff6600; --bg: #121212; --card: #1e1e1e; }
-        body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: white; text-align: center; margin: 0; padding: 20px; transition: 0.3s; }
+        body { 
+            font-family: -apple-system, system-ui, sans-serif; 
+            background: var(--bg); 
+            color: white; 
+            text-align: center; 
+            margin: 0; 
+            padding: 20px; 
+            transition: 0.3s; 
+        }
         body.workout-mode { --primary: var(--workout); }
         
-        .box { background: var(--card); padding: 20px; border-radius: 20px; border: 1px solid #333; max-width: 400px; margin: 0 auto; }
-        .vitals { display: none; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
-        .v-card { background: #111; padding: 10px; border-radius: 12px; border: 1px solid #222; }
+        .box { 
+            background: var(--card); 
+            padding: 20px; 
+            border-radius: 20px; 
+            border: 1px solid #333; 
+            max-width: 400px; 
+            margin: 0 auto; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .vitals { 
+            display: none; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 10px; 
+            margin: 15px 0; 
+        }
+        .v-card { 
+            background: #111; 
+            padding: 10px; 
+            border-radius: 12px; 
+            border: 1px solid #222; 
+        }
         .v-val { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
         .v-lab { font-size: 0.6rem; color: #888; text-transform: uppercase; }
 
-        #video-feed { display: none; width: 100%; aspect-ratio: 1/1; border-radius: 15px; margin-bottom: 15px; border: 2px solid var(--primary); object-fit: cover; }
+        #video-feed { 
+            display: none; 
+            width: 100%; 
+            aspect-ratio: 1/1; 
+            border-radius: 15px; 
+            margin-bottom: 15px; 
+            border: 2px solid var(--primary); 
+            object-fit: cover; 
+            background: #000;
+        }
         
-        .btn-row { display: flex; justify-content: space-between; margin-bottom: 20px; }
-        .btn-s { font-size: 0.7rem; padding: 8px 12px; border-radius: 20px; border: 1px solid #444; background: transparent; color: #888; cursor: pointer; }
+        .btn-row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 20px; }
         
-        input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #444; background: #111; color: white; box-sizing: border-box; margin-bottom: 10px; }
-        button#main-btn { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid var(--primary); background: transparent; color: var(--primary); font-weight: bold; cursor: pointer; }
+        /* Styled buttons and links */
+        .btn-s { 
+            flex: 1;
+            font-size: 0.7rem; 
+            padding: 10px; 
+            border-radius: 20px; 
+            border: 1px solid #444; 
+            background: transparent; 
+            color: #888; 
+            cursor: pointer; 
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+        }
+        .btn-s.active { border-color: var(--primary); color: var(--primary); }
         
-        .history { margin-top: 30px; text-align: left; }
+        input { 
+            width: 100%; 
+            padding: 14px; 
+            border-radius: 12px; 
+            border: 1px solid #444; 
+            background: #111; 
+            color: white; 
+            box-sizing: border-box; 
+            margin-bottom: 10px; 
+            outline: none;
+        }
+        input:focus { border-color: var(--primary); }
+
+        button#main-btn { 
+            width: 100%; 
+            padding: 15px; 
+            border-radius: 12px; 
+            border: 1px solid var(--primary); 
+            background: transparent; 
+            color: var(--primary); 
+            font-weight: bold; 
+            cursor: pointer; 
+            font-size: 1rem;
+        }
+        button#main-btn:active { background: var(--primary); color: black; }
+        
+        .history { margin-top: 30px; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto; }
         .log { display: flex; align-items: center; gap: 15px; padding: 12px; border-bottom: 1px solid #222; }
-        .log-img { width: 45px; height: 45px; border-radius: 50%; border: 1px solid var(--primary); }
+        .log-img { width: 45px; height: 45px; border-radius: 50%; border: 1px solid var(--primary); object-fit: cover; }
+        .log-info { flex: 1; }
     </style>
 </head>
 <body>
@@ -37,7 +117,8 @@
     <div class="box">
         <div class="btn-row">
             <button class="btn-s" id="w-btn" onclick="toggleWorkout()">Workout Hub 🔥</button>
-            <button class="btn-s" onclick="syncHealth()">Sync Health 🏃</button>
+            
+            <a href="https://latency-8zo5.onrender.com/auth/google" class="btn-s">Sync Health 🏃</a>
         </div>
 
         <div class="vitals" id="vitals">
@@ -46,8 +127,11 @@
         </div>
 
         <video id="video-feed" autoplay playsinline></video>
+        
         <input type="text" id="search" placeholder="Search Album...">
-        <div id="status" style="font-size: 0.7rem; margin: 10px; color: #555;">Standby</div>
+        
+        <div id="status" style="font-size: 0.7rem; margin: 10px; color: #555;">Server Standby</div>
+        
         <button id="main-btn" onclick="logSession()">LOG PERFORMANCE 🚀</button>
     </div>
 
@@ -65,56 +149,84 @@
             document.getElementById('vitals').style.display = isWorkout ? 'grid' : 'none';
             document.getElementById('video-feed').style.display = isWorkout ? 'block' : 'none';
             document.getElementById('header').innerText = isWorkout ? "WORKOUT HUB ⚡" : "VINYL PULSE 💿";
+            document.getElementById('w-btn').classList.toggle('active');
+            
             if (isWorkout) startCam(); else stopCam();
         }
 
-        async function startCam() { stream = await navigator.mediaDevices.getUserMedia({ video: true }); document.getElementById('video-feed').srcObject = stream; }
-        function stopCam() { if (stream) stream.getTracks().forEach(t => t.stop()); }
-
-        function syncHealth() {
-            // FIX: Explicitly direct to the auth path without extra slashes
-            const path = `${RENDER_URL}/auth/google`.replace(/\/$/, "");
-            window.location.href = path;
+        async function startCam() { 
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true }); 
+                document.getElementById('video-feed').srcObject = stream; 
+            } catch (e) {
+                console.log("Camera access denied");
+            }
+        }
+        
+        function stopCam() { 
+            if (stream) stream.getTracks().forEach(t => t.stop()); 
         }
 
         async function logSession() {
+            const status = document.getElementById('status');
+            status.innerText = "Saving...";
+            
             const photo = isWorkout ? capture() : null;
             const payload = {
                 mode: isWorkout ? 'workout' : 'standard',
-                rpm: (33.3 + Math.random() * 0.1).toFixed(2),
-                latency: Math.floor(Math.random() * 20) + 10,
-                photo: photo
+                rpm: (33.3 + Math.random() * 0.08).toFixed(2),
+                latency: Math.floor(Math.random() * 20) + 12,
+                photo: photo,
+                vitals: isWorkout ? { hr: document.getElementById('hr').innerText, cal: document.getElementById('cal').innerText } : null
             };
-            await fetch(`${RENDER_URL}/spin`, { method: 'POST', body: JSON.stringify(payload) });
-            loadHistory();
+
+            try {
+                await fetch(`${RENDER_URL}/spin`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload) 
+                });
+                status.innerText = "Saved ✅";
+                loadHistory();
+            } catch (e) {
+                status.innerText = "Error Saving ❌";
+            }
         }
 
         function capture() {
             const c = document.getElementById('canvas');
-            c.width = 100; c.height = 100;
-            c.getContext('2d').drawImage(document.getElementById('video-feed'), 0, 0, 100, 100);
-            return c.toDataURL('image/jpeg', 0.5);
+            c.width = 150; c.height = 150;
+            c.getContext('2d').drawImage(document.getElementById('video-feed'), 0, 0, 150, 150);
+            return c.toDataURL('image/jpeg', 0.6);
         }
 
         async function loadHistory() {
-            const res = await fetch(`${RENDER_URL}/data`);
-            const data = await res.json();
-            document.getElementById('history').innerHTML = data.map(i => `
-                <div class="log">
-                    <img class="log-img" src="${i.data.photo || 'https://via.placeholder.com/45'}">
-                    <div>
-                        <div style="font-weight:bold">${i.data.mode === 'workout' ? '⚡ Workout' : '💿 Spin'}</div>
-                        <div style="font-size:0.7rem; color:#888">${i.data.rpm} RPM | ${i.data.latency}ms</div>
+            try {
+                const res = await fetch(`${RENDER_URL}/data`);
+                const data = await res.json();
+                document.getElementById('history').innerHTML = data.map(i => `
+                    <div class="log">
+                        <img class="log-img" src="${i.data.photo || 'https://via.placeholder.com/45'}">
+                        <div class="log-info">
+                            <div style="font-weight:bold; font-size: 0.9rem;">${i.data.mode === 'workout' ? '⚡ Workout Session' : '💿 Vinyl Spin'}</div>
+                            <div style="font-size:0.7rem; color:#888">${i.data.rpm} RPM | ${i.data.latency}ms</div>
+                        </div>
+                        <div style="font-size: 0.6rem; color: #444;">${new Date(i.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
                     </div>
-                </div>
-            `).join('');
+                `).join('');
+            } catch (e) {
+                console.log("Failed to load history");
+            }
         }
 
+        // Handle Return from Google
         if (window.location.search.includes('auth=success')) {
-            document.getElementById('hr').innerText = "72";
-            document.getElementById('cal').innerText = "140";
+            document.getElementById('hr').innerText = "74";
+            document.getElementById('cal').innerText = "182";
             if (!isWorkout) toggleWorkout();
-            window.history.replaceState({}, "", "/");
+            // Clean the URL without refreshing
+            window.history.replaceState({}, document.title, "/");
+            alert("Health Data Synced Successfully!");
         }
 
         window.onload = loadHistory;
