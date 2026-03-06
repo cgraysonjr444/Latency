@@ -99,7 +99,7 @@
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th { border-bottom: 2px solid #333; padding: 12px; color: var(--neon-green); text-transform: uppercase; font-size: 0.75rem; }
         td { padding: 12px; border-bottom: 1px solid #2a2a2a; font-size: 0.85rem; vertical-align: middle; }
-        .album-art { width: 45px; height: 45px; border-radius: 4px; background: #333; }
+        .album-art { width: 45px; height: 45px; border-radius: 4px; background: #333; object-fit: cover; }
         .listen-link { font-size: 0.7rem; color: var(--neon-green); text-decoration: none; font-weight: bold; }
         .listen-link:hover { text-decoration: underline; }
     </style>
@@ -151,12 +151,13 @@
 
     <script>
         const RENDER_URL = "https://latency-8zo5.onrender.com";
+        const DEFAULT_IMG = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100&h=100&fit=crop&auto=format";
         let selectedAlbum = null;
 
         const albumInput = document.getElementById('album-input');
         const searchResults = document.getElementById('search-results');
 
-        // Search Discogs via your Render Bridge
+        // Search Discogs via Bridge
         albumInput.addEventListener('input', async (e) => {
             const q = e.target.value;
             if (q.length < 3) { searchResults.innerHTML = ""; return; }
@@ -166,8 +167,8 @@
                 const items = await res.json();
                 
                 searchResults.innerHTML = items.map(item => `
-                    <div class="result-item" onclick="selectAlbum('${item.title.replace(/'/g, "\\'")}', '${item.thumb}')">
-                        <img src="${item.thumb || 'https://via.placeholder.com/40'}">
+                    <div class="result-item" onclick="selectAlbum('${item.title.replace(/'/g, "\\'")}', '${item.thumb || DEFAULT_IMG}')">
+                        <img src="${item.thumb || DEFAULT_IMG}">
                         <span>${item.title}</span>
                     </div>
                 `).join('');
@@ -203,15 +204,14 @@
                 data.forEach(row => {
                     const tr = document.createElement('tr');
                     const time = new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    const albumTitle = row.data?.album?.title || "Unknown Album";
-                    const albumThumb = row.data?.album?.thumb || "https://via.placeholder.com/45";
+                    const albumTitle = row.data?.album?.title || "Generic Spin";
+                    const albumThumb = row.data?.album?.thumb || DEFAULT_IMG;
                     
-                    // Generate Apple Music Search Link
                     const amLink = `https://music.apple.com/search?term=${encodeURIComponent(albumTitle)}`;
 
                     tr.innerHTML = `
                         <td style="display: flex; align-items: center; gap: 12px; border: none;">
-                            <img src="${albumThumb}" class="album-art">
+                            <img src="${albumThumb}" class="album-art" onerror="this.src='${DEFAULT_IMG}'">
                             <div style="text-align: left;">
                                 <div style="font-weight: bold; font-size: 0.9rem;">${albumTitle}</div>
                                 <a href="${amLink}" target="_blank" class="listen-link">▶ Listen on Apple Music</a>
@@ -237,7 +237,7 @@
                 const payload = {
                     rpm: (Math.random() * (33.4 - 33.2) + 33.2).toFixed(2),
                     latency: Math.floor(Math.random() * 50) + 10,
-                    album: selectedAlbum || { title: "Generic Spin", thumb: "" }
+                    album: selectedAlbum || { title: "Generic Spin", thumb: DEFAULT_IMG }
                 };
 
                 await fetch(`${RENDER_URL}/spin`, {
@@ -274,7 +274,7 @@
         }
 
         window.addEventListener('DOMContentLoaded', updateDashboard);
-        setInterval(updateDashboard, 60000); // Auto-refresh every minute
+        setInterval(updateDashboard, 60000); 
     </script>
 </body>
 </html>
