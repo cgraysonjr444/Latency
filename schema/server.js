@@ -32,7 +32,7 @@ Deno.serve({ port: 10000 }, async (req) => {
       }
     }
 
-    // 1. GOOGLE AUTH START
+    // 1. GOOGLE AUTH HANDSHAKE
     if (path.includes("auth/google")) {
       const scopes = ["https://www.googleapis.com/auth/fitness.activity.read", "https://www.googleapis.com/auth/fitness.heart_rate.read"].join(" ");
       const googleUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
@@ -45,7 +45,6 @@ Deno.serve({ port: 10000 }, async (req) => {
       return Response.redirect(googleUrl.toString(), 302);
     }
 
-    // 2. GOOGLE CALLBACK
     if (path.includes("auth/callback")) {
       const code = url.searchParams.get("code") || "";
       const tRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -58,25 +57,29 @@ Deno.serve({ port: 10000 }, async (req) => {
       return Response.redirect("https://latency-8zo5.onrender.com/?auth=success", 302);
     }
 
-    // 3. DISCOGS SEARCH BRIDGE
+    // 2. DISCOGS BRIDGE (Returns JSON array)
     if (path === "/search-album") {
       const q = url.searchParams.get("q") || "";
       const dRes = await fetch(`https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release&per_page=5`, {
         headers: { "Authorization": `Discogs token=${DISCOGS_TOKEN}`, "User-Agent": "VinylPulse/1.1" }
       });
       const dData = await dRes.json();
-      return new Response(JSON.stringify(dData.results || []), { headers });
+      return new Response(JSON.stringify(dData.results || []), { 
+        headers: { ...headers, "Content-Type": "application/json" } 
+      });
     }
 
-    // 4. DATA LOGGING
+    // 3. DATA LOGGING (Saves plain object)
     if (path === "/spin" && req.method === "POST") {
       const body = await req.json();
+      if (!sql) throw new Error("DB Missing");
       const res = await sql`INSERT INTO spins (data) VALUES (${sql.json(body)}) RETURNING *`;
       return new Response(JSON.stringify(res[0]), { headers });
     }
 
-    // 5. DATA FETCH
+    // 4. DATA FETCH
     if (path === "/data") {
+      if (!sql) return new Response("[]", { headers });
       const data = await sql`SELECT * FROM spins ORDER BY created_at DESC LIMIT 20`;
       return new Response(JSON.stringify(data), { headers });
     }
