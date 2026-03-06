@@ -13,30 +13,21 @@ const headers = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
-Deno.serve({ port: parseInt(Deno.env.get("PORT") || "10000") }, async (req) => {
+Deno.serve({ port: 10000 }, async (req) => {
   const url = new URL(req.url);
-  // Normalize the path (lowercase and remove trailing slashes)
-  const path = url.pathname.toLowerCase().replace(/\/$/, "");
+  const path = url.pathname.toLowerCase();
 
-  // --- DEBUG LOG: Check Render Dashboard Logs to see this ---
-  console.log(`Incoming: ${req.method} ${path}`);
-
-  // 1. --- THE ABSOLUTE PRIORITY: GOOGLE AUTH REDIRECT ---
-  // We check for "auth/google" anywhere in the path
-  if (path.includes("auth/google")) {
-    const scopes = [
-      "https://www.googleapis.com/auth/fitness.activity.read",
-      "https://www.googleapis.com/auth/fitness.heart_rate.read"
-    ].join(" ");
-
+  // --- 1. THE REDIRECT (NO FALLTHROUGH) ---
+  if (path.includes("/auth/google")) {
+    const scopes = "https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.heart_rate.read";
     const googleUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(scopes)}&access_type=offline&prompt=consent`;
     
-    console.log("Redirecting to Google...");
+    console.log("!!! REDIRECTING TO GOOGLE !!!");
     return Response.redirect(googleUrl, 302);
   }
 
-  // 2. --- THE CALLBACK ---
-  if (path.includes("auth/callback")) {
+  // --- 2. THE CALLBACK ---
+  if (path.includes("/auth/callback")) {
     const code = url.searchParams.get("code") || "";
     const tParams = new URLSearchParams({
       code, client_id: CLIENT_ID, client_secret: CLIENT_SECRET, redirect_uri: REDIRECT_URI, grant_type: "authorization_code"
@@ -49,12 +40,12 @@ Deno.serve({ port: parseInt(Deno.env.get("PORT") || "10000") }, async (req) => {
     });
     
     const tokens = await tRes.json();
-    console.log(tokens.access_token ? "Sync: Tokens Received" : "Sync: Failed");
+    console.log("Tokens fetched:", tokens.access_token ? "SUCCESS" : "FAIL");
 
     return Response.redirect("https://latency-8zo5.onrender.com/?auth=success", 302);
   }
 
-  // 3. --- STANDARD API LOGIC ---
+  // --- 3. API ROUTES ---
   if (req.method === "OPTIONS") return new Response(null, { headers });
 
   try {
@@ -69,16 +60,8 @@ Deno.serve({ port: parseInt(Deno.env.get("PORT") || "10000") }, async (req) => {
       return new Response(JSON.stringify(data), { headers });
     }
 
-    // 4. --- THE FALLBACK (The page you're currently stuck on) ---
-    const stats = await sql`SELECT count(*) FROM spins`;
-    return new Response(`
-      💿 VINYL PULSE API
-      ------------------
-      Status: ONLINE
-      Database: ✅ Connected
-      Logs: ${stats[0].count}
-      Debug Path: ${path}
-    `, { headers: { ...headers, "Content-Type": "text/plain" } });
+    // --- 4. THE FALLBACK (ONLY IF NOTHING ELSE MATCHES) ---
+    return new Response(`Vinyl Pulse API: Path [${path}] ignored.`, { headers });
 
   } catch (err) {
     return new Response(`Error: ${err.message}`, { status: 500, headers });
