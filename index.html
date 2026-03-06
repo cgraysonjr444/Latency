@@ -9,19 +9,27 @@
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: white; text-align: center; margin: 0; padding: 20px; }
         body.workout-mode { --primary: var(--workout); }
         .box { background: var(--card); padding: 20px; border-radius: 20px; border: 1px solid #333; max-width: 400px; margin: 0 auto; }
+        
+        /* Album Preview Styling */
+        #preview-container { display: none; margin-bottom: 15px; }
+        #album-preview { width: 120px; height: 120px; border-radius: 10px; border: 2px solid var(--primary); object-fit: cover; box-shadow: 0 0 15px rgba(0,255,204,0.3); }
+        
         .vitals { display: none; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
         .v-card { background: #111; padding: 10px; border-radius: 12px; border: 1px solid #222; }
         .v-val { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
         #video-feed { display: none; width: 100%; aspect-ratio: 1/1; border-radius: 15px; margin-bottom: 15px; border: 2px solid var(--primary); object-fit: cover; }
         .btn-row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 20px; }
-        .btn-s { flex: 1; font-size: 0.7rem; padding: 10px; border-radius: 20px; border: 1px solid #444; background: transparent; color: #888; text-decoration: none; display: flex; align-items: center; justify-content: center; }
-        input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #444; background: #111; color: white; box-sizing: border-box; margin-bottom: 10px; }
-        button#main-btn { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid var(--primary); background: transparent; color: var(--primary); font-weight: bold; font-size: 1rem; }
+        .btn-s { flex: 1; font-size: 0.7rem; padding: 10px; border-radius: 20px; border: 1px solid #444; background: transparent; color: #888; text-decoration: none; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        
+        input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #444; background: #111; color: white; box-sizing: border-box; margin-bottom: 10px; font-size: 1rem; }
+        button#main-btn { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid var(--primary); background: transparent; color: var(--primary); font-weight: bold; font-size: 1rem; cursor: pointer; transition: 0.2s; }
+        button#main-btn:active { background: var(--primary); color: black; }
+
         .history { margin-top: 30px; text-align: left; max-width: 400px; margin: 30px auto 0; }
         .log { display: flex; align-items: center; gap: 15px; padding: 12px; border-bottom: 1px solid #222; }
-        .log-img { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; }
+        .log-img { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; background: #333; }
         .log-info { flex: 1; }
-        .am-link { font-size: 0.7rem; color: var(--primary); text-decoration: none; }
+        .am-link { font-size: 0.7rem; color: var(--primary); text-decoration: none; display: block; margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -31,15 +39,23 @@
             <button class="btn-s" onclick="toggleWorkout()">Workout Hub 🔥</button>
             <a href="/auth/google" class="btn-s">Sync Health 🏃</a>
         </div>
+
         <div class="vitals" id="vitals">
             <div class="v-card"><div class="v-val" id="hr">--</div><div style="font-size:0.6rem;color:#888">HR</div></div>
             <div class="v-card"><div class="v-val" id="cal">--</div><div style="font-size:0.6rem;color:#888">CAL</div></div>
         </div>
+
         <video id="video-feed" autoplay playsinline></video>
-        <input type="text" id="search" placeholder="Search Album + Enter">
-        <div id="status" style="font-size: 0.7rem; margin: 10px; color: #555;">Ready</div>
+
+        <div id="preview-container">
+            <img id="album-preview" src="" alt="Album Art">
+        </div>
+
+        <input type="text" id="search" placeholder="Search Album + Press Enter" autocomplete="off">
+        <div id="status" style="font-size: 0.7rem; margin: 10px; color: #888;">Ready</div>
         <button id="main-btn" onclick="logSession()">LOG PERFORMANCE 🚀</button>
     </div>
+
     <div class="history" id="history"></div>
 
     <script>
@@ -53,51 +69,93 @@
             document.getElementById('vitals').style.display = isWorkout ? 'grid' : 'none';
             document.getElementById('video-feed').style.display = isWorkout ? 'block' : 'none';
             if (isWorkout) {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                document.getElementById('video-feed').srcObject = stream;
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    document.getElementById('video-feed').srcObject = stream;
+                } catch (e) { console.error("Camera access denied"); }
             }
         }
 
+        // --- SEARCH LOGIC ---
         document.getElementById('search').addEventListener('keypress', async (e) => {
             if (e.key === 'Enter') {
-                document.getElementById('status').innerText = "Searching...";
-                const res = await fetch(`${RENDER_URL}/search-album?q=${encodeURIComponent(e.target.value)}`);
-                const data = await res.json();
-                if (data && data.length > 0) {
-                    e.target.value = data[0].title;
-                    lastThumb = data[0].thumb;
-                    document.getElementById('status').innerText = "Album Found! 💿";
-                } else {
-                    document.getElementById('status').innerText = "Not found on Discogs";
+                const query = e.target.value;
+                if (!query) return;
+
+                document.getElementById('status').innerText = "Searching Discogs...";
+                
+                try {
+                    const res = await fetch(`${RENDER_URL}/search-album?q=${encodeURIComponent(query)}`);
+                    const data = await res.json();
+
+                    if (data && data.length > 0) {
+                        const album = data[0];
+                        
+                        // Update Input and Save Metadata
+                        document.getElementById('search').value = album.title;
+                        lastThumb = album.thumb;
+
+                        // Show Preview Image
+                        const previewImg = document.getElementById('album-preview');
+                        previewImg.src = album.thumb;
+                        document.getElementById('preview-container').style.display = 'block';
+                        
+                        document.getElementById('status').innerText = "Album Found! 💿";
+                    } else {
+                        document.getElementById('status').innerText = "No results found on Discogs.";
+                        document.getElementById('preview-container').style.display = 'none';
+                    }
+                } catch (err) {
+                    document.getElementById('status').innerText = "Search Error. Check connection.";
                 }
             }
         });
 
+        // --- LOG LOGIC ---
         async function logSession() {
-            const albumName = document.getElementById('search').value || "Unknown Spin";
+            const albumName = document.getElementById('search').value;
+            if (!albumName) {
+                document.getElementById('status').innerText = "Enter an album first!";
+                return;
+            }
+
             const payload = {
                 album: albumName,
                 thumb: lastThumb,
                 rpm: (33.3 + Math.random() * 0.05).toFixed(2),
                 mode: isWorkout ? 'workout' : 'standard'
             };
-            await fetch(`${RENDER_URL}/spin`, { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload) 
-            });
-            document.getElementById('search').value = "";
-            lastThumb = "";
-            loadHistory();
+
+            document.getElementById('status').innerText = "Saving...";
+
+            try {
+                await fetch(`${RENDER_URL}/spin`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload) 
+                });
+
+                // Reset UI
+                document.getElementById('search').value = "";
+                document.getElementById('preview-container').style.display = 'none';
+                lastThumb = "";
+                document.getElementById('status').innerText = "Performance Logged! 🚀";
+                
+                loadHistory();
+            } catch (e) {
+                document.getElementById('status').innerText = "Failed to save.";
+            }
         }
 
+        // --- HISTORY LOGIC ---
         async function loadHistory() {
             try {
                 const res = await fetch(`${RENDER_URL}/data`);
                 const data = await res.json();
+                
                 document.getElementById('history').innerHTML = data.map(i => {
                     const d = i.data || {};
-                    // Handle [object Object] bug: extract string name if nested
+                    // Handle [object Object] bug for old/corrupt logs
                     let name = typeof d.album === 'string' ? d.album : (d.album?.title || "Unknown Spin");
                     if (name === "[object Object]") name = "Unknown Spin";
                     
@@ -106,19 +164,21 @@
                     
                     return `
                         <div class="log">
-                            <img class="log-img" src="${img}">
+                            <img class="log-img" src="${img}" onerror="this.src='https://via.placeholder.com/50'">
                             <div class="log-info">
-                                <div style="font-weight:bold">${name}</div>
+                                <div style="font-weight:bold; font-size: 0.9rem;">${name}</div>
                                 <a class="am-link" href="${amLink}" target="_blank">Listen on Apple Music 🎵</a>
                             </div>
                         </div>
                     `;
                 }).join('');
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error("Could not load history"); }
         }
 
+        // Check for Google Auth Success
         if (window.location.search.includes('auth=success')) {
             document.getElementById('hr').innerText = "78"; 
+            document.getElementById('status').innerText = "Health Synced!";
         }
 
         window.onload = loadHistory;
