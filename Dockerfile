@@ -2,9 +2,9 @@ FROM denoland/deno:alpine-1.41.0
 
 WORKDIR /app
 
-# Copy everything from your repo into the container
+# Copy everything (including the schema folder and index.html)
 COPY . .
 
-# Grant permissions and run the server
-# Adjust the path below if your server.js is in a folder (e.g., ./schema/server.js)
-CMD ["run", "--allow-net", "--allow-read", "--allow-env", "server.js"]
+# Run the server from the schema folder
+# We use 'schema/server.js' because that is where it lives in your repo
+CMD ["run", "--allow-net", "--allow-read", "--allow-env", "schema/server.js"]
