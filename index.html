@@ -2,82 +2,102 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>VINYL PULSE 💿</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#121212">
+    <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22VinylPulse%22,%22short_name%22:%22Pulse%22,%22start_url%22:%22/%22,%22display%22:%22standalone%22,%22background_color%22:%22#121212%22,%22theme_color%22:%22#00ffcc%22}">
+
     <style>
         :root { 
-            --primary-color: #00ffcc; /* Neon Green */
+            --primary-color: #00ffcc; 
             --dark-bg: #121212; 
             --card-bg: #1e1e1e; 
         }
-        /* Workout Mode Theme */
-        body.workout-mode { --primary-color: #ff6600; } /* Electric Orange */
+        body.workout-mode { --primary-color: #ff6600; }
 
         body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
             background: var(--dark-bg); 
             color: white; 
             text-align: center; 
-            padding: 2rem; 
+            padding: env(safe-area-inset-top) 1rem 2rem 1rem;
             margin: 0;
             transition: background 0.5s ease;
         }
-        h1 { font-size: 2.5rem; letter-spacing: 2px; margin-bottom: 0.5rem; transition: color 0.3s; }
-        .subtitle { color: #888; margin-bottom: 1rem; }
+
+        h1 { font-size: 2rem; letter-spacing: 2px; margin-top: 1rem; transition: color 0.3s; }
+        .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 1.5rem; }
         
         .box { 
             background: var(--card-bg); 
-            padding: 25px; 
-            border-radius: 12px; 
+            padding: 20px; 
+            border-radius: 16px; 
             border: 1px solid #333; 
             display: inline-block; 
-            min-width: 380px;
+            width: 100%;
+            max-width: 400px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            margin-bottom: 20px;
-            vertical-align: top;
+            margin-bottom: 15px;
+            box-sizing: border-box;
         }
 
-        /* Workout Mode Toggle */
-        .mode-toggle {
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-        }
+        /* Mode Toggle & Health Sync */
+        .header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn-small { font-size: 0.7rem; padding: 6px 12px; border-radius: 20px; }
 
-        /* Camera Feed Styles */
+        /* Vitals Dashboard */
+        #vitals-grid { 
+            display: none; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 10px; 
+            margin-bottom: 15px; 
+        }
+        .vital-card { 
+            background: #111; 
+            padding: 10px; 
+            border-radius: 10px; 
+            border: 1px solid #222; 
+        }
+        .vital-value { font-size: 1.2rem; font-weight: bold; color: var(--primary-color); }
+        .vital-label { font-size: 0.6rem; color: #888; text-transform: uppercase; }
+
+        /* Camera Feed */
         #camera-container {
             display: none;
             width: 100%;
-            max-width: 300px;
-            margin: 10px auto;
-            border-radius: 8px;
+            aspect-ratio: 1/1;
+            margin: 0 auto 15px auto;
+            border-radius: 12px;
             overflow: hidden;
             border: 2px solid var(--primary-color);
+            background: #000;
         }
-        video { width: 100%; transform: scaleX(-1); } /* Mirror effect */
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
         
-        .search-box { margin-bottom: 20px; position: relative; }
+        /* Search & Inputs */
+        .search-box { margin-bottom: 15px; position: relative; }
         input {
-            width: 90%;
+            width: 100%;
             padding: 12px;
-            border-radius: 8px;
+            border-radius: 10px;
             border: 1px solid #444;
             background: #111;
             color: white;
             outline: none;
+            box-sizing: border-box;
         }
         input:focus { border-color: var(--primary-color); }
 
         #search-results {
             background: #252525;
-            border-radius: 0 0 8px 8px;
+            border-radius: 0 0 10px 10px;
             max-height: 150px;
             overflow-y: auto;
             position: absolute;
-            width: 94%;
-            left: 3%;
+            width: 100%;
             z-index: 10;
         }
         .result-item {
@@ -88,95 +108,100 @@
             cursor: pointer;
             border-bottom: 1px solid #333;
             text-align: left;
+            font-size: 0.8rem;
         }
-        .result-item:hover { background: #333; }
-        .result-item img { width: 30px; height: 30px; border-radius: 4px; }
+        .result-item img { width: 35px; height: 35px; border-radius: 4px; }
 
         .selected-badge {
             background: #2a2a2a;
             padding: 10px;
-            border-radius: 8px;
+            border-radius: 10px;
             margin-bottom: 15px;
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 12px;
             border: 1px solid var(--primary-color);
         }
 
-        .status { margin: 12px 0; font-weight: 600; font-size: 1.1rem; }
+        .status { margin: 10px 0; font-weight: 600; font-size: 0.9rem; }
         .primary { color: var(--primary-color); }
-        .red { color: #ff4444; }
         
-        .btn-group { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
-        
+        .btn-group { display: flex; gap: 8px; justify-content: center; }
         button {
             background: transparent;
             border: 1px solid var(--primary-color);
             color: var(--primary-color);
-            padding: 10px 18px;
-            border-radius: 5px;
+            padding: 12px 20px;
+            border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
-            transition: 0.3s;
+            flex: 1;
         }
         button:hover { background: var(--primary-color); color: black; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { border-color: #555; color: #888; }
 
-        .btn-secondary { border-color: #888; color: #888; }
-        .btn-secondary:hover { background: #888; color: black; }
-
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th { border-bottom: 2px solid #333; padding: 12px; color: var(--primary-color); text-transform: uppercase; font-size: 0.75rem; }
-        td { padding: 12px; border-bottom: 1px solid #2a2a2a; font-size: 0.85rem; vertical-align: middle; }
-        .album-art { width: 45px; height: 45px; border-radius: 4px; background: #333; object-fit: cover; }
-        .progress-img { width: 45px; height: 45px; border-radius: 50%; border: 1px solid var(--primary-color); object-fit: cover; }
+        /* History Table */
+        .history-container { width: 100%; max-width: 800px; margin: 20px auto; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 500px; }
+        th { padding: 12px; color: var(--primary-color); font-size: 0.7rem; text-transform: uppercase; border-bottom: 2px solid #333; }
+        td { padding: 12px; border-bottom: 1px solid #222; font-size: 0.85rem; }
+        .album-art { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; }
+        .progress-img { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--primary-color); object-fit: cover; }
     </style>
 </head>
 <body>
 
     <h1 id="main-title">VINYL PULSE 💿</h1>
-    <p class="subtitle">Audio & Fitness Performance Pipeline</p>
-
-    <div class="mode-toggle">
-        <span>Standard Mode</span>
-        <button id="toggle-btn" onclick="toggleWorkoutMode()" style="border-radius: 20px; padding: 5px 15px;">Switch to Workout Hub 🔥</button>
-    </div>
+    <p class="subtitle">Audio & Fitness Data Pipeline</p>
 
     <div class="box">
+        <div class="header-actions">
+            <button class="btn-small btn-secondary" onclick="toggleWorkoutMode()" id="mode-btn">Workout Hub 🔥</button>
+            <button class="btn-small btn-secondary" onclick="syncHealth()">Sync Health 🏃</button>
+        </div>
+
+        <div id="vitals-grid">
+            <div class="vital-card">
+                <div class="vital-value" id="live-bpm">--</div>
+                <div class="vital-label">Heart Rate</div>
+            </div>
+            <div class="vital-card">
+                <div class="vital-value" id="live-cal">--</div>
+                <div class="vital-label">Calories</div>
+            </div>
+        </div>
+
         <div id="camera-container">
             <video id="video" autoplay playsinline></video>
-            <div style="font-size: 0.7rem; padding: 5px; background: #000;">LIVE WORKOUT FEED</div>
         </div>
 
         <div class="search-box">
-            <input type="text" id="album-input" placeholder="Search Album..." autocomplete="off">
+            <input type="text" id="album-input" placeholder="What are we spinning?" autocomplete="off">
             <div id="search-results"></div>
         </div>
 
         <div id="selected-display" style="display: none;" class="selected-badge">
             <img id="sel-img" src="" class="album-art">
             <div style="text-align: left;">
-                <div id="sel-title" style="font-weight: bold; font-size: 0.9rem;"></div>
-                <div style="font-size: 0.7rem; color: #888;">Selected Album</div>
+                <div id="sel-title" style="font-weight: bold; font-size: 0.8rem;"></div>
             </div>
         </div>
 
-        <div id="server-status" class="status">Checking Server...</div>
+        <div id="server-status" class="status">Connecting...</div>
         
         <div class="btn-group">
-            <button id="spin-btn" onclick="sendTestSpin()">Log Performance 🚀</button>
-            <button class="btn-secondary" onclick="downloadCSV()">Export CSV 📊</button>
+            <button id="spin-btn" onclick="sendTestSpin()">LOG SESSION 🚀</button>
+            <button class="btn-secondary" style="flex:0;" onclick="downloadCSV()">📊</button>
         </div>
     </div>
 
-    <div class="box" style="width: 95%; max-width: 900px; display: block; margin: 20px auto;">
-        <h3 style="margin-top: 0;">Performance Log</h3>
-        <table>
+    <div class="history-container">
+        <table id="history-table">
             <thead>
                 <tr>
-                    <th style="text-align: left;">Entry</th>
-                    <th style="text-align: center;">RPM</th>
-                    <th style="text-align: center;">Latency</th>
+                    <th style="text-align: left;">Activity</th>
+                    <th>RPM</th>
+                    <th>Latency</th>
                     <th style="text-align: right;">Time</th>
                 </tr>
             </thead>
@@ -193,39 +218,46 @@
         let isWorkoutMode = false;
         let stream = null;
 
-        // --- WORKOUT MODE & CAMERA ---
+        // --- WORKOUT & HEALTH ---
         async function toggleWorkoutMode() {
             isWorkoutMode = !isWorkoutMode;
             document.body.classList.toggle('workout-mode');
             const videoContainer = document.getElementById('camera-container');
-            const btn = document.getElementById('toggle-btn');
+            const vitals = document.getElementById('vitals-grid');
+            const btn = document.getElementById('mode-btn');
             const title = document.getElementById('main-title');
 
             if (isWorkoutMode) {
-                btn.innerText = "Back to Standard Mode 💿";
+                btn.innerText = "Music Mode 🎵";
                 title.innerText = "WORKOUT HUB ⚡";
                 videoContainer.style.display = "block";
+                vitals.style.display = "grid";
                 try {
                     stream = await navigator.mediaDevices.getUserMedia({ video: true });
                     document.getElementById('video').srcObject = stream;
-                } catch (err) { console.error("Camera access denied"); }
+                } catch (err) { alert("Camera required for workout photos."); }
             } else {
-                btn.innerText = "Switch to Workout Hub 🔥";
+                btn.innerText = "Workout Hub 🔥";
                 title.innerText = "VINYL PULSE 💿";
                 videoContainer.style.display = "none";
+                vitals.style.display = "none";
                 if (stream) stream.getTracks().forEach(t => t.stop());
             }
         }
 
+        async function syncHealth() {
+            // Placeholder for Google Fit OAuth flow
+            alert("Connecting to Google Fit API...");
+            document.getElementById('live-bpm').innerText = "72";
+            document.getElementById('live-cal').innerText = "140";
+        }
+
         function captureSnapshot() {
             if (!isWorkoutMode) return null;
-            const video = document.getElementById('video');
             const canvas = document.getElementById('canvas');
-            canvas.width = 100;
-            canvas.height = 100;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, 100, 100);
-            return canvas.toDataURL('image/jpeg', 0.5); // Returns small Base64 string
+            canvas.width = 100; canvas.height = 100;
+            canvas.getContext('2d').drawImage(document.getElementById('video'), 0, 0, 100, 100);
+            return canvas.toDataURL('image/jpeg', 0.5);
         }
 
         // --- DISCOGS SEARCH ---
@@ -256,7 +288,7 @@
             try {
                 const response = await fetch(`${RENDER_URL}/data`);
                 const data = await response.json();
-                document.getElementById('server-status').innerText = "Result: Server Online ✅";
+                document.getElementById('server-status').innerText = "System Online ✅";
                 document.getElementById('server-status').className = "status primary";
 
                 const historyBody = document.getElementById('history-body');
@@ -267,16 +299,16 @@
                     const isWorkout = row.data?.mode === 'workout';
                     
                     tr.innerHTML = `
-                        <td style="display: flex; align-items: center; gap: 12px; border: none;">
+                        <td style="display: flex; align-items: center; gap: 12px;">
                             ${row.data?.photo ? `<img src="${row.data.photo}" class="progress-img">` : `<img src="${row.data?.album?.thumb || DEFAULT_IMG}" class="album-art">`}
                             <div style="text-align: left;">
-                                <div style="font-weight: bold; font-size: 0.9rem;">${row.data?.album?.title || "Session"}</div>
-                                <div style="font-size: 0.7rem; color: ${isWorkout ? '#ff6600' : '#00ffcc'};">${isWorkout ? '💪 WORKOUT RECORD' : '🎵 STANDARD SPIN'}</div>
+                                <div style="font-weight: bold; font-size: 0.8rem;">${row.data?.album?.title || "Session"}</div>
+                                <div style="font-size: 0.6rem; color: #888;">${isWorkout ? '🔥 Workout Log' : '💿 Spin Log'}</div>
                             </div>
                         </td>
                         <td style="text-align: center;">${row.data?.rpm || "--"}</td>
                         <td style="text-align: center;" class="primary">${row.data?.latency || "--"}ms</td>
-                        <td style="text-align: right; color: #555; font-size: 0.75rem;">${time}</td>
+                        <td style="text-align: right; color: #555; font-size: 0.7rem;">${time}</td>
                     `;
                     historyBody.appendChild(tr);
                 });
@@ -290,11 +322,12 @@
 
             try {
                 const payload = {
-                    rpm: (Math.random() * (33.4 - 33.2) + 33.2).toFixed(2),
-                    latency: Math.floor(Math.random() * 50) + 10,
-                    album: selectedAlbum || { title: isWorkoutMode ? "Workout Session" : "Generic Spin", thumb: DEFAULT_IMG },
+                    rpm: (33.3 + (Math.random() * 0.1)).toFixed(2),
+                    latency: Math.floor(Math.random() * 40) + 10,
+                    album: selectedAlbum || { title: isWorkoutMode ? "Training Session" : "Generic Spin", thumb: DEFAULT_IMG },
                     mode: isWorkoutMode ? 'workout' : 'standard',
-                    photo: photo // This saves the small photo directly to Postgres JSONB!
+                    photo: photo,
+                    vitals: isWorkoutMode ? { bpm: 72, cal: 140 } : null
                 };
 
                 await fetch(`${RENDER_URL}/spin`, {
@@ -302,13 +335,17 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                if (isWorkoutMode) { /* Keep album for workout duration if needed */ } else { selectedAlbum = null; document.getElementById('selected-display').style.display = "none"; }
+                
+                if (!isWorkoutMode) {
+                    selectedAlbum = null;
+                    document.getElementById('selected-display').style.display = "none";
+                }
                 updateDashboard();
-            } catch (err) { alert("Error saving record."); }
+            } catch (err) { alert("Network Error"); }
             finally { btn.disabled = false; }
         }
 
-        function downloadCSV() { /* Existing CSV logic */ }
+        function downloadCSV() { /* CSV Logic remains the same */ }
         window.addEventListener('DOMContentLoaded', updateDashboard);
     </script>
 </body>
