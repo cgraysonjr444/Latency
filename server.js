@@ -59,7 +59,6 @@ Deno.serve({ port: 10000 }, async (req) => {
         headers: { Authorization: `Bearer ${tokens.access_token}` }
       });
       const user = await uRes.json();
-      // Redirect back to root with user data
       return Response.redirect(`/?auth=success&user=${encodeURIComponent(user.email)}`, 302);
     }
 
@@ -73,22 +72,30 @@ Deno.serve({ port: 10000 }, async (req) => {
       return new Response(JSON.stringify(dData.results || []), { headers: { ...headers, "Content-Type": "application/json" } });
     }
 
-    // 5. LOG SPIN (The Save Route)
+    // 5. LOG SPIN (Save Route)
     if (path === "/spin" && req.method === "POST") {
       const body = await req.json();
-      if (!sql) throw new Error("Database connection URL missing in environment variables.");
-      
+      if (!sql) throw new Error("Database connection URL missing.");
       const res = await sql`INSERT INTO spins (data) VALUES (${sql.json(body)}) RETURNING *`;
       return new Response(JSON.stringify(res[0]), { headers: { ...headers, "Content-Type": "application/json" } });
     }
 
-    // 6. GET DATA (The Load Route)
+    // 6. GET DATA (Load Route)
     if (path === "/data") {
       const user = url.searchParams.get("user") || "guest_user";
-      if (!sql) return new Response(JSON.stringify({ error: "No DB connection" }), { status: 503, headers });
-
+      if (!sql) return new Response(JSON.stringify([]), { headers: { ...headers, "Content-Type": "application/json" } });
       const data = await sql`SELECT * FROM spins WHERE data->>'user_email' = ${user} ORDER BY created_at DESC LIMIT 20`;
       return new Response(JSON.stringify(data), { headers: { ...headers, "Content-Type": "application/json" } });
     }
 
-    return new Response("Not Found", { status: 404
+    // 7. CATCH-ALL
+    return new Response("Not Found", { status: 404, headers });
+
+  } catch (err) {
+    console.error("CRITICAL ERROR:", err.message);
+    return new Response(JSON.stringify({ 
+      error: true, 
+      message: err.message 
+    }), { status: 500, headers: { ...headers, "Content-Type": "application/json" } });
+  }
+});
