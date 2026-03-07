@@ -1,11 +1,33 @@
 import postgres from "https://deno.land/x/postgresjs@v3.3.3/mod.js";
 
+// --- CONFIGURATION & DATABASE CONNECTION ---
 const databaseUrl = Deno.env.get("DATABASE_URL");
+
+// Use SSL "require" and disable "prepare" for maximum compatibility with Render Postgres
 const sql = databaseUrl ? postgres(databaseUrl, { 
-  ssl: { rejectUnauthorized: false }, 
+  ssl: "require", 
   prepare: false,
+  idle_timeout: 20,
   connect_timeout: 10
 }) : null;
+
+// --- AUTO-INITIALIZE TABLE ---
+if (sql) {
+  (async () => {
+    try {
+      await sql`
+        CREATE TABLE IF NOT EXISTS spins (
+          id SERIAL PRIMARY KEY,
+          data JSONB NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `;
+      console.log("✅ Database table 'spins' is ready.");
+    } catch (err) {
+      console.error("❌ Database Initialization Error:", err.message);
+    }
+  })();
+}
 
 const CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
@@ -72,16 +94,18 @@ Deno.serve({ port: 10000 }, async (req) => {
       return new Response(JSON.stringify(dData.results || []), { headers: { ...headers, "Content-Type": "application/json" } });
     }
 
+    // Save Data
     if (path === "/spin" && req.method === "POST") {
       const body = await req.json();
-      if (!sql) throw new Error("DB_OFFLINE");
+      if (!sql) throw new Error("Database URL not found in environment.");
       const res = await sql`INSERT INTO spins (data) VALUES (${sql.json(body)}) RETURNING *`;
       return new Response(JSON.stringify(res[0]), { headers: { ...headers, "Content-Type": "application/json" } });
     }
 
+    // Load Data
     if (path === "/data") {
       const user = url.searchParams.get("user") || "guest_user";
-      if (!sql) return new Response("[]", { headers: { ...headers, "Content-Type": "application/json" } });
+      if (!sql) return new Response(JSON.stringify([]), { headers: { ...headers, "Content-Type": "application/json" } });
       const data = await sql`SELECT * FROM spins WHERE data->>'user_email' = ${user} ORDER BY created_at DESC LIMIT 20`;
       return new Response(JSON.stringify(data), { headers: { ...headers, "Content-Type": "application/json" } });
     }
@@ -89,7 +113,11 @@ Deno.serve({ port: 10000 }, async (req) => {
     return new Response("Not Found", { status: 404, headers });
 
   } catch (err) {
-    console.error("CRITICAL ERROR:", err.message);
-    return new Response(JSON.stringify({ error: true, message: err.message }), { status: 500, headers: { ...headers, "Content-Type": "application/json" } });
+    console.error("SERVER ERROR:", err.message);
+    // Return a JSON error so the frontend doesn't crash on "unexpected character"
+    return new Response(JSON.stringify({ error: true, message: err.message }), { 
+      status: 500, 
+      headers: { ...headers, "Content-Type": "application/json" } 
+    });
   }
 });
