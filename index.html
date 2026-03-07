@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>VINYL PULSE 💿</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💿</text></svg>">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #00ffcc; --latency: #ff0077; --bg: #121212; --card: #1e1e1e; }
@@ -44,7 +45,6 @@
     <script>
         let lastThumb = "";
         let myChart = null;
-
         const params = new URLSearchParams(window.location.search);
         const currentUser = params.get('user') || localStorage.getItem('vp_user') || "guest_user";
         if (params.get('user')) localStorage.setItem('vp_user', params.get('user'));
@@ -71,7 +71,7 @@
                 user_email: currentUser,
                 album: albumName,
                 thumb: lastThumb,
-                hr: document.getElementById('hr').innerText === "--" ? 72 : parseInt(document.getElementById('hr').innerText),
+                hr: 72 + Math.floor(Math.random() * 10), // Random placeholder BPM
                 rpm: (33.3 + (Math.random() * 0.04 - 0.02)).toFixed(2),
                 timestamp: new Date().toISOString()
             };
@@ -139,5 +139,4 @@
         window.onload = loadHistory;
     </script>
 </body>
-</html>
 </html>
