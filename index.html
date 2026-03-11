@@ -10,28 +10,15 @@
         :root { --primary: #00ffcc; --latency: #ff0077; --bg: #121212; --card: #1e1e1e; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: white; text-align: center; margin: 0; padding: 10px; overflow-x: hidden; }
         .box { background: var(--card); padding: 15px; border-radius: 20px; border: 1px solid #333; max-width: 450px; margin: 0 auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .chart-container { background: #000; padding: 10px; border-radius: 15px; margin: 15px 0; border: 1px solid #222; height: 220px; position: relative; }
+        .chart-container { background: #000; padding: 10px; border-radius: 15px; margin: 15px 0; border: 1px solid #222; height: 200px; position: relative; }
         
-        /* Album Preview & Animation */
-        #preview-container { display: none; margin-bottom: 15px; perspective: 1000px; }
+        #preview-container { display: none; margin: 20px auto; width: 140px; height: 140px; }
         #album-preview { 
-            width: 120px; 
-            height: 120px; 
-            border-radius: 50%; /* Circle like a record */
-            border: 4px solid #000;
-            box-shadow: 0 0 20px rgba(0,255,204,0.3), inset 0 0 10px rgba(0,0,0,1);
-            object-fit: cover;
-            transition: transform 0.5s ease;
+            width: 140px; height: 140px; border-radius: 50%; border: 5px solid #000;
+            box-shadow: 0 0 15px var(--primary); object-fit: cover;
         }
-        
-        /* The Spinning Animation */
-        @keyframes record-spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-        .spinning {
-            animation: record-spin 1.8s linear infinite; /* ~33.3 RPM feel */
-        }
+
+        @keyframes record-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         .vitals { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
         .v-card { background: #111; padding: 10px; border-radius: 12px; border: 1px solid #222; }
@@ -39,26 +26,22 @@
         .rpm-text { color: var(--latency) !important; }
         
         input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #444; background: #111; color: white; box-sizing: border-box; margin-bottom: 10px; font-size: 1rem; outline: none; }
-        button#main-btn { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid var(--primary); background: transparent; color: var(--primary); font-weight: bold; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; }
+        button#main-btn { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid var(--primary); background: transparent; color: var(--primary); font-weight: bold; cursor: pointer; }
         button#main-btn:disabled { border-color: #444; color: #444; }
         
         .history { margin-top: 20px; text-align: left; max-width: 450px; margin: 20px auto; padding-bottom: 50px; }
-        .log { display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid #222; font-size: 0.85rem; background: rgba(255,255,255,0.02); margin-bottom: 5px; border-radius: 8px; }
-        .log-img { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; background: #222; border: 1px solid #444; }
-        .am-link { font-size: 0.7rem; color: var(--primary); text-decoration: none; border: 1px solid #444; padding: 2px 8px; border-radius: 10px; display: inline-block; margin-top: 5px; }
-        .btn-s { text-decoration: none; color: #888; border: 1px solid #444; padding: 8px; border-radius: 15px; font-size: 0.7rem; display: block; margin-bottom: 15px; }
+        .log { display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid #222; font-size: 0.85rem; }
+        .log-img { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 1px solid #444; }
         #status { font-size: 0.7rem; color: #888; margin-bottom: 10px; height: 1em; }
     </style>
 </head>
 <body>
-    <h1 style="letter-spacing: 4px; font-size: 1.5rem; margin-top: 10px;">VINYL PULSE 💿</h1>
+    <h1 style="letter-spacing: 3px;">VINYL PULSE 💿</h1>
     <div class="box">
-        <a href="/auth/google" class="btn-s">Sync Health Vitals 🏃</a>
+        <a href="/auth/google" style="text-decoration:none; color:#888; font-size:0.7rem; border:1px solid #444; padding:5px 10px; border-radius:10px; display:inline-block; margin-bottom:10px;">Sync Health Vitals 🏃</a>
         <div class="chart-container"><canvas id="pulseChart"></canvas></div>
         
-        <div id="preview-container">
-            <img id="album-preview" src="" alt="Album Art">
-        </div>
+        <div id="preview-container"><img id="album-preview" src=""></div>
 
         <div class="vitals">
             <div class="v-card"><div class="v-val" id="hr-display">--</div><div style="font-size:0.6rem;color:#888">BPM (HEART)</div></div>
@@ -69,48 +52,29 @@
         <div id="status">Ready</div>
         <button id="main-btn" onclick="logSession()">LOG PERFORMANCE 🚀</button>
     </div>
-    
-    <div class="history">
-        <h3 style="font-size: 0.9rem; color: #555; margin-left: 10px; letter-spacing: 1px;">PREVIOUS SPINS</h3>
-        <div id="history"></div>
-    </div>
+    <div class="history" id="history"></div>
 
     <script>
         const API_BASE = "https://latency-8zo5.onrender.com";
-        const cacheBuster = () => `&_cb=${Date.now()}`;
-
         let lastThumb = "";
         let myChart = null;
         const params = new URLSearchParams(window.location.search);
-        
         const currentUser = params.get('user') || localStorage.getItem('vp_user') || "guest_user";
-        const fitnessBPM = params.get('bpm');
         
         if (params.get('user')) localStorage.setItem('vp_user', params.get('user'));
-        if (fitnessBPM && fitnessBPM !== "null") {
-            document.getElementById('hr-display').innerText = fitnessBPM;
-            document.getElementById('status').innerText = "Vitals Synced! ❤️";
-        }
+        if (params.get('bpm')) document.getElementById('hr-display').innerText = params.get('bpm');
 
         document.getElementById('search').addEventListener('keypress', async (e) => {
             if (e.key === 'Enter') {
-                const query = e.target.value.trim();
-                if (!query) return;
                 document.getElementById('status').innerText = "Searching...";
-                try {
-                    const res = await fetch(`${API_BASE}/search-album?q=${encodeURIComponent(query)}${cacheBuster()}`);
-                    const data = await res.json();
-                    if (data && data.length > 0) {
-                        e.target.value = data[0].title;
-                        lastThumb = data[0].thumb;
-                        const img = document.getElementById('album-preview');
-                        img.src = lastThumb;
-                        img.classList.remove('spinning'); // Reset animation
-                        document.getElementById('preview-container').style.display = 'block';
-                        document.getElementById('status').innerText = "Record found. Ready to spin.";
-                    }
-                } catch (err) {
-                    document.getElementById('status').innerText = "Search failed.";
+                const res = await fetch(`${API_BASE}/search-album?q=${encodeURIComponent(e.target.value)}`);
+                const data = await res.json();
+                if (data.length > 0) {
+                    e.target.value = data[0].title;
+                    lastThumb = data[0].thumb;
+                    document.getElementById('album-preview').src = lastThumb;
+                    document.getElementById('preview-container').style.display = 'block';
+                    document.getElementById('status').innerText = "Record Found.";
                 }
             }
         });
@@ -119,104 +83,64 @@
             const albumName = document.getElementById('search').value;
             if (!albumName) return;
 
-            const btn = document.getElementById('main-btn');
             const img = document.getElementById('album-preview');
+            const btn = document.getElementById('main-btn');
+
+            // --- THE SPIN LOGIC ---
+            img.style.animation = "none";
+            img.offsetHeight; // Force reflow
+            img.style.animation = "record-spin 1.5s linear infinite";
             
-            // Start the spin!
-            img.classList.add('spinning');
             btn.innerText = "SPINNING...";
             btn.disabled = true;
-            
+
             const payload = {
                 user_email: currentUser,
                 album: albumName,
                 thumb: lastThumb,
-                hr: document.getElementById('hr-display').innerText === "--" ? 72 : parseInt(document.getElementById('hr-display').innerText),
+                hr: parseInt(document.getElementById('hr-display').innerText) || 72,
                 rpm: (33.3 + (Math.random() * 0.04 - 0.02)).toFixed(2),
                 timestamp: new Date().toISOString()
             };
 
-            try {
-                const res = await fetch(`${API_BASE}/spin`, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload) 
-                });
-                if (res.ok) {
-                    // Let it spin for a second for effect
-                    setTimeout(async () => {
-                        document.getElementById('status').innerText = "Session Recorded!";
-                        document.getElementById('search').value = "";
-                        document.getElementById('preview-container').style.display = 'none';
-                        img.classList.remove('spinning');
-                        await loadHistory();
-                        btn.innerText = "LOG PERFORMANCE 🚀";
-                        btn.disabled = false;
-                    }, 1200);
-                }
-            } catch (e) {
-                document.getElementById('status').innerText = "Save error.";
+            await fetch(`${API_BASE}/spin`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            
+            setTimeout(async () => {
+                document.getElementById('preview-container').style.display = 'none';
+                img.style.animation = "none";
+                document.getElementById('search').value = "";
+                await loadHistory();
+                btn.innerText = "LOG PERFORMANCE 🚀";
                 btn.disabled = false;
-            }
+            }, 1500);
         }
 
         async function loadHistory() {
-            try {
-                const res = await fetch(`${API_BASE}/data?user=${encodeURIComponent(currentUser)}${cacheBuster()}`);
-                const data = await res.json();
-                const historyDiv = document.getElementById('history');
-                
-                if (!data || data.length === 0) {
-                    historyDiv.innerHTML = "<p style='text-align:center; color:#444; font-size: 0.8rem;'>No history yet.</p>";
-                    updateChart([]);
-                    return;
-                }
-
-                historyDiv.innerHTML = data.map(i => {
-                    const d = i.data || {};
-                    const amUrl = `https://music.apple.com/search?term=${encodeURIComponent(d.album || "")}`;
-                    return `
-                        <div class="log">
-                            <img class="log-img" src="${d.thumb || ''}" onerror="this.src='https://via.placeholder.com/45?text=💿'">
-                            <div style="flex:1">
-                                <strong>${d.album}</strong><br>
-                                <span style="color:var(--primary)">${d.hr} BPM</span> | 
-                                <span style="color:var(--latency)">${d.rpm} RPM</span><br>
-                                <a href="${amUrl}" target="_blank" class="am-link">Apple Music 🎵</a>
-                            </div>
-                        </div>`;
-                }).join('');
-
-                updateChart(data.slice(0, 10).reverse());
-            } catch (e) {
-                console.error("Load fail:", e);
-            }
+            const res = await fetch(`${API_BASE}/data?user=${encodeURIComponent(currentUser)}`);
+            const data = await res.json();
+            document.getElementById('history').innerHTML = data.map(i => `
+                <div class="log">
+                    <img class="log-img" src="${i.data.thumb}" onerror="this.src='https://via.placeholder.com/45'">
+                    <div style="flex:1"><strong>${i.data.album}</strong><br><span style="color:var(--primary)">${i.data.hr} BPM</span> | <span style="color:var(--latency)">${i.data.rpm} RPM</span></div>
+                </div>`).join('');
+            updateChart(data.slice(0, 10).reverse());
         }
 
         function updateChart(recentData) {
             const ctx = document.getElementById('pulseChart').getContext('2d');
             if (myChart) myChart.destroy();
-            
-            const labels = recentData.length > 0 ? recentData.map((_, i) => i + 1) : [1,2,3,4,5];
-            const bpmData = recentData.length > 0 ? recentData.map(i => i.data.hr) : [0,0,0,0,0];
-            const rpmData = recentData.length > 0 ? recentData.map(i => parseFloat(i.data.rpm)) : [33.3,33.3,33.3,33.3,33.3];
-
             myChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: labels,
+                    labels: recentData.map((_, i) => i + 1),
                     datasets: [
-                        { label: 'BPM', data: bpmData, borderColor: '#00ffcc', backgroundColor: 'rgba(0,255,204,0.1)', fill: true, tension: 0.4 },
-                        { label: 'RPM', data: rpmData, borderColor: '#ff0077', yAxisID: 'y1', pointRadius: 0 }
+                        { label: 'BPM', data: recentData.map(i => i.data.hr), borderColor: '#00ffcc', tension: 0.4 },
+                        { label: 'RPM', data: recentData.map(i => parseFloat(i.data.rpm)), borderColor: '#ff0077', yAxisID: 'y1' }
                     ]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    scales: { 
-                        y: { ticks: { color: '#00ffcc', font: { size: 9 } }, grid: { color: '#222' } }, 
-                        y1: { position: 'right', suggestedMin: 33.2, suggestedMax: 33.4, ticks: { color: '#ff0077', font: { size: 9 } }, grid: { display: false } },
-                        x: { display: false }
-                    },
+                    scales: { y: { ticks: { color: '#00ffcc', font: { size: 8 } } }, y1: { position: 'right', suggestedMin: 33.2, suggestedMax: 33.4, ticks: { color: '#ff0077', font: { size: 8 } } }, x: { display: false } },
                     plugins: { legend: { display: false } }
                 }
             });
