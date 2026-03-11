@@ -5,14 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>VINYL PULSE 💿</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💿</text></svg>">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.bundle.min.js"></script>
     <style>
         :root { --primary: #00ffcc; --latency: #ff0077; --bg: #121212; --card: #1e1e1e; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: white; text-align: center; margin: 0; padding: 10px; overflow-x: hidden; }
         .box { background: var(--card); padding: 15px; border-radius: 20px; border: 1px solid #333; max-width: 450px; margin: 0 auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .chart-container { background: #000; padding: 10px; border-radius: 15px; margin: 10px 0; border: 1px solid #222; height: 180px; }
         
-        /* Centered Record Style */
         #preview-container { display: none; margin: 15px auto; width: 130px; height: 130px; }
         #album-preview { 
             width: 130px; height: 130px; border-radius: 50%; border: 4px solid #000;
@@ -20,6 +19,7 @@
             display: block; margin: 0 auto;
         }
 
+        /* The Animation Definition */
         @keyframes record-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         .vitals { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
@@ -28,9 +28,7 @@
         .rpm-text { color: var(--latency) !important; }
         
         input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #444; background: #111; color: white; box-sizing: border-box; margin-bottom: 10px; font-size: 1rem; outline: none; }
-        button#main-btn { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid var(--primary); background: transparent; color: var(--primary); font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button#main-btn:active { background: var(--primary); color: black; }
-        button#main-btn:disabled { border-color: #444; color: #444; }
+        button#main-btn { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid var(--primary); background: transparent; color: var(--primary); font-weight: bold; cursor: pointer; }
         
         .history { margin-top: 20px; text-align: left; max-width: 450px; margin: 20px auto; padding-bottom: 50px; }
         .log { display: flex; align-items: center; gap: 12px; padding: 10px; border-bottom: 1px solid #222; font-size: 0.85rem; }
@@ -41,14 +39,11 @@
     <h1 style="letter-spacing: 3px; font-size: 1.4rem;">VINYL PULSE 💿</h1>
     <div class="box">
         <div class="chart-container"><canvas id="pulseChart"></canvas></div>
-        
         <div id="preview-container"><img id="album-preview" src=""></div>
-
         <div class="vitals">
             <div class="v-card"><div class="v-val" id="hr-display">--</div><div style="font-size:0.6rem;color:#888">BPM (HEART)</div></div>
             <div class="v-card"><div class="v-val rpm-text" id="rpm-display">33.30</div><div style="font-size:0.6rem;color:#888">RPM (LATENCY)</div></div>
         </div>
-
         <input type="text" id="search" placeholder="Search Album + Enter" autocomplete="off">
         <button id="main-btn" onclick="logSession()">LOG PERFORMANCE 🚀</button>
         <p id="status" style="font-size:0.7rem; color:#888; margin-top:10px;">Ready</p>
@@ -59,10 +54,6 @@
         const API_BASE = "https://latency-8zo5.onrender.com";
         let lastThumb = "";
         let myChart = null;
-
-        // Sound Effect for Logging
-        const needleSound = new Audio("https://www.soundjay.com/misc/sounds/record-scratch-1.mp3");
-        needleSound.volume = 0.2;
 
         const params = new URLSearchParams(window.location.search);
         const currentUser = params.get('user') || localStorage.getItem('vp_user') || "guest_user";
@@ -77,9 +68,11 @@
                 if (data.length > 0) {
                     e.target.value = data[0].title;
                     lastThumb = data[0].thumb;
-                    document.getElementById('album-preview').src = lastThumb;
+                    const img = document.getElementById('album-preview');
+                    img.src = lastThumb;
+                    img.style.animation = "none"; // Reset
                     document.getElementById('preview-container').style.display = 'block';
-                    document.getElementById('status').innerText = "Loaded. Hit Log to Spin.";
+                    document.getElementById('status').innerText = "Record Loaded.";
                 }
             }
         });
@@ -91,10 +84,8 @@
             const img = document.getElementById('album-preview');
             const btn = document.getElementById('main-btn');
 
-            // 1. Play sound & start spin immediately
-            needleSound.play().catch(() => {}); 
-            img.style.animation = "record-spin 1.2s linear infinite";
-            
+            // --- FORCE SPIN ---
+            img.style.animation = "record-spin 1s linear infinite";
             btn.innerText = "SPINNING...";
             btn.disabled = true;
 
@@ -107,39 +98,50 @@
                 timestamp: new Date().toISOString()
             };
 
-            // Start API call in background
-            const saveTask = fetch(`${API_BASE}/spin`, { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify(payload) 
-            });
+            try {
+                // We await the fetch but keep the animation going for at least 1.5s
+                const startTime = Date.now();
+                await fetch(`${API_BASE}/spin`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify(payload) 
+                });
 
-            // 2. Wait at least 1.5 seconds so user sees the spin
-            setTimeout(async () => {
-                await saveTask;
-                document.getElementById('preview-container').style.display = 'none';
-                img.style.animation = "none";
-                document.getElementById('search').value = "";
-                document.getElementById('status').innerText = "Session Tracked!";
-                await loadHistory();
-                btn.innerText = "LOG PERFORMANCE 🚀";
+                const elapsed = Date.now() - startTime;
+                const remaining = Math.max(0, 1500 - elapsed);
+
+                setTimeout(async () => {
+                    document.getElementById('preview-container').style.display = 'none';
+                    img.style.animation = "none";
+                    document.getElementById('search').value = "";
+                    document.getElementById('status').innerText = "Session Tracked!";
+                    await loadHistory();
+                    btn.innerText = "LOG PERFORMANCE 🚀";
+                    btn.disabled = false;
+                }, remaining);
+
+            } catch (e) {
+                document.getElementById('status').innerText = "Save error.";
                 btn.disabled = false;
-            }, 1500);
+                img.style.animation = "none";
+            }
         }
 
         async function loadHistory() {
-            const res = await fetch(`${API_BASE}/data?user=${encodeURIComponent(currentUser)}`);
-            const data = await res.json();
-            document.getElementById('history').innerHTML = data.map(i => `
-                <div class="log">
-                    <img class="log-img" src="${i.data.thumb}" onerror="this.src='https://via.placeholder.com/40'">
-                    <div style="flex:1; text-align:left;">
-                        <strong>${i.data.album}</strong><br>
-                        <span style="color:var(--primary)">${i.data.hr} BPM</span> | 
-                        <span style="color:var(--latency)">${i.data.rpm} RPM</span>
-                    </div>
-                </div>`).join('');
-            updateChart(data.slice(0, 10).reverse());
+            try {
+                const res = await fetch(`${API_BASE}/data?user=${encodeURIComponent(currentUser)}&_cb=${Date.now()}`);
+                const data = await res.json();
+                document.getElementById('history').innerHTML = data.map(i => `
+                    <div class="log">
+                        <img class="log-img" src="${i.data.thumb}" onerror="this.src='https://via.placeholder.com/40'">
+                        <div style="flex:1; text-align:left;">
+                            <strong>${i.data.album}</strong><br>
+                            <span style="color:var(--primary)">${i.data.hr} BPM</span> | 
+                            <span style="color:var(--latency)">${i.data.rpm} RPM</span>
+                        </div>
+                    </div>`).join('');
+                updateChart(data.slice(0, 10).reverse());
+            } catch (e) { console.error(e); }
         }
 
         function updateChart(recentData) {
