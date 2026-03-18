@@ -3,171 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Latency Monitor | cgraysonjr444</title>
+    <title>Latency App | cgraysonjr444</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root {
-            --bg: #0d1117;
-            --card: #161b22;
-            --accent: #00ffcc;
-            --border: #30363d;
-            --text: #c9d1d9;
-        }
-
-        body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: -apple-system, sans-serif;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
-        }
-
-        h1 { color: var(--accent); margin-bottom: 5px; }
-        .subtitle { opacity: 0.6; margin-bottom: 30px; font-size: 0.9rem; }
-
-        /* THE VISIBILITY FIX: Fixed height prevents Chart.js from collapsing to 0px */
-        #chart-wrapper {
-            position: relative;
-            height: 400px;
-            width: 95vw;
-            max-width: 900px;
-            background: var(--card);
-            border: 1px solid var(--border);
+        body { background: #0d1117; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
+        
+        /* THE VISIBILITY FIX: A fixed height prevents the chart from collapsing to 0px */
+        #chart-container { 
+            position: relative; 
+            height: 400px; 
+            width: 90%; 
+            max-width: 800px; 
+            margin: 20px auto; 
+            background: #161b22;
+            border: 1px solid #30363d;
             border-radius: 12px;
             padding: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
-
-        .stats-row {
-            display: flex;
-            gap: 20px;
-            margin-top: 20px;
-            width: 95vw;
-            max-width: 900px;
-        }
-
-        .stat-card {
-            flex: 1;
-            background: var(--card);
-            border: 1px solid var(--border);
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-        }
-
-        .stat-value {
-            display: block;
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--accent);
-        }
-
-        .stat-label { font-size: 0.8rem; opacity: 0.7; text-transform: uppercase; }
+        
+        #status { font-size: 0.9rem; color: #8b949e; margin-top: 10px; }
+        .accent { color: #00ffcc; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <h1>System Latency Pulse</h1>
-    <div class="subtitle">Real-time Performance Monitoring</div>
-
-    <div id="chart-wrapper">
+    <h1>System <span class="accent">Latency</span> Monitor</h1>
+    
+    <div id="chart-container">
         <canvas id="latencyChart"></canvas>
     </div>
 
-    <div class="stats-row">
-        <div class="stat-card">
-            <span class="stat-label">Current Latency</span>
-            <span id="current-ping" class="stat-value">-- ms</span>
-        </div>
-        <div class="stat-card">
-            <span class="stat-label">Server Status</span>
-            <span id="server-status" class="stat-value" style="color: #8b949e;">Connecting...</span>
-        </div>
-    </div>
+    <div id="status">Status: Initializing...</div>
 
     <script>
-        // 1. UPDATE THIS to your actual Render Web Service URL
+        // 1. UPDATE THIS with your actual Render Web Service URL
         const API_URL = "https://your-service-name.onrender.com"; 
 
         const ctx = document.getElementById('latencyChart').getContext('2d');
-        const pingDisplay = document.getElementById('current-ping');
-        const statusDisplay = document.getElementById('server-status');
+        const statusEl = document.getElementById('status');
 
-        // 2. INITIALIZE CHART
+        // 2. INITIALIZE CHART WITH DEMO DATA (So it's never blank)
         const myChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: [],
+                labels: ['Demo 1', 'Demo 2', 'Demo 3'],
                 datasets: [{
-                    label: 'Latency',
-                    data: [],
+                    label: 'Latency (ms)',
+                    data: [12, 18, 15],
                     borderColor: '#00ffcc',
                     backgroundColor: 'rgba(0, 255, 204, 0.1)',
                     borderWidth: 3,
                     tension: 0.4,
-                    fill: true,
-                    pointRadius: 4,
-                    pointBackgroundColor: '#00ffcc'
+                    fill: true
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false, // Essential for fixed-height container
+                maintainAspectRatio: false,
                 scales: {
-                    y: { 
-                        beginAtZero: true, 
-                        grid: { color: 'rgba(255,255,255,0.05)' },
-                        ticks: { color: '#8b949e' } 
-                    },
-                    x: { 
-                        grid: { display: false },
-                        ticks: { color: '#8b949e' } 
-                    }
-                },
-                plugins: {
-                    legend: { display: false }
+                    y: { beginAtZero: true, grid: { color: '#333' } },
+                    x: { grid: { display: false } }
                 }
             }
         });
 
-        // 3. FETCH AND SYNC DATA
-        async function fetchData() {
+        // 3. FETCH DATA AND SWAP DEMO DATA FOR REAL DATA
+        async function updateDashboard() {
             try {
                 const res = await fetch(`${API_URL}/stats`);
-                if (!res.ok) throw new Error("Offline");
-                
                 const data = await res.json();
 
                 if (data.length > 0) {
-                    const latest = data[data.length - 1];
-                    
-                    // Update Text Stats
-                    pingDisplay.innerText = `${latest.ping_ms} ms`;
-                    statusDisplay.innerText = "Online";
-                    statusDisplay.style.color = "#238636";
-
-                    // Update Chart Data
-                    myChart.data.labels = data.map(d => {
-                        const time = new Date(d.created_at);
-                        return time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                    });
+                    // Update Chart with real Database data
+                    myChart.data.labels = data.map(d => new Date(d.created_at).toLocaleTimeString());
                     myChart.data.datasets[0].data = data.map(d => d.ping_ms);
+                    myChart.data.datasets[0].borderColor = '#00ffcc'; // Switch back to green
                     
-                    myChart.update('none'); // Update without flickering
+                    statusEl.innerHTML = `Status: <span class="accent">Live</span> | Latest: ${data[data.length-1].ping_ms}ms`;
+                } else {
+                    statusEl.innerText = "Status: Connected (Database Empty - Showing Demo Mode)";
                 }
+                myChart.update('none');
             } catch (err) {
-                console.error("Fetch failed:", err);
-                statusDisplay.innerText = "Offline";
-                statusDisplay.style.color = "#da3633";
+                statusEl.innerHTML = `Status: <span style="color: #ff4444;">Offline</span> (Check Render URL)`;
+                console.error(err);
             }
         }
 
         // Auto-refresh every 5 seconds
-        setInterval(fetchData, 5000);
-        fetchData();
+        setInterval(updateDashboard, 5000);
+        updateDashboard();
     </script>
 </body>
+</html>
 </html>
