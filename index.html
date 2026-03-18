@@ -2,212 +2,172 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VINYL PULSE 💿</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Latency Monitor | cgraysonjr444</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --primary: #00ffcc; --latency: #ff0077; --bg: #0a0a0a; --card: #161616; --gold: #ffd700; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: white; text-align: center; margin: 0; padding: 10px; overflow-x: hidden; }
-        
-        .box { background: var(--card); padding: 20px; border-radius: 24px; border: 1px solid #222; max-width: 450px; margin: 0 auto; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
-        .chart-container { background: #000; padding: 10px; border-radius: 18px; margin: 15px 0; border: 1px solid #1a1a1a; height: 180px; position: relative; }
-        
-        #preview-container { display: none; margin: 20px auto; width: 130px; height: 130px; }
-        #album-preview { width: 130px; height: 130px; border-radius: 50%; border: 4px solid #000; box-shadow: 0 0 20px var(--primary); object-fit: cover; display: block; margin: 0 auto; }
-        @keyframes record-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --accent: #00ffcc;
+            --text: #c9d1d9;
+        }
 
-        .vitals { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
-        .v-card { background: #000; padding: 12px; border-radius: 15px; border: 1px solid #222; }
-        .v-val { font-size: 1.4rem; font-weight: 800; color: var(--primary); }
-        .rpm-text { color: var(--latency) !important; }
-        
-        .badge-container { margin: 20px auto; display: flex; justify-content: center; align-items: center; }
-        .count-badge { background: #000; border: 1px solid var(--primary); padding: 6px 15px; border-radius: 20px; font-size: 0.75rem; color: var(--primary); font-weight: bold; letter-spacing: 1px; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
 
-        input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #333; background: #000; color: white; box-sizing: border-box; margin-bottom: 12px; font-size: 1rem; outline: none; }
-        button#main-btn { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid var(--primary); background: transparent; color: var(--primary); font-weight: bold; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: 0.2s; }
-        button#main-btn:active { background: var(--primary); color: black; }
-        button#main-btn:disabled { border-color: #444; color: #444; }
-        
-        .history-wrap { margin-top: 30px; text-align: left; max-width: 450px; margin: 30px auto; padding-bottom: 60px; }
-        .log { display: flex; align-items: center; gap: 12px; padding: 10px; border-bottom: 1px solid #1a1a1a; font-size: 0.85rem; }
-        .log-img { width: 45px; height: 45px; border-radius: 50%; border: 1px solid #333; object-fit: cover; }
-        #status { font-size: 0.7rem; color: #666; margin-top: 10px; min-height: 1.2em; }
+        header {
+            margin: 40px 0;
+            text-align: center;
+        }
+
+        h1 { color: var(--accent); margin: 0; font-size: 2rem; }
+        p { opacity: 0.8; }
+
+        /* THE CRITICAL CHART FIX: Fixed height prevents collapse */
+        #chartWrapper {
+            position: relative;
+            height: 350px; 
+            width: 90%;
+            max-width: 800px;
+            background: var(--card-bg);
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            width: 90%;
+            max-width: 800px;
+            margin-top: 30px;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #30363d;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--accent);
+            display: block;
+        }
     </style>
 </head>
 <body>
-    <h1 style="letter-spacing: 4px; font-size: 1.4rem; margin: 15px 0;">VINYL PULSE 💿</h1>
-    
-    <div class="box">
-        <div class="chart-container"><canvas id="pulseChart"></canvas></div>
-        <div id="preview-container"><img id="album-preview" src=""></div>
-        
-        <div class="vitals">
-            <div class="v-card"><div class="v-val" id="hr-display">--</div><div style="font-size:0.6rem;color:#888">BPM (HEART)</div></div>
-            <div class="v-card"><div class="v-val rpm-text" id="rpm-display">33.30</div><div style="font-size:0.6rem;color:#888">RPM (LATENCY)</div></div>
-        </div>
 
-        <input type="text" id="search" placeholder="Search Album + Enter" autocomplete="off">
-        <button id="main-btn" onclick="logSession()">LOG PERFORMANCE 🚀</button>
-        <p id="status">System Ready</p>
+    <header>
+        <h1>System Latency Monitor</h1>
+        <p>Live performance tracking for cgraysonjr444.github.io</p>
+    </header>
+
+    <div id="chartWrapper">
+        <canvas id="latencyChart"></canvas>
     </div>
 
-    <div class="history-wrap">
-        <div class="badge-container">
-            <div class="count-badge">TOTAL SPINS: <span id="total-count">0</span></div>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <span class="stat-label">Current Ping</span>
+            <span id="currentPing" class="stat-value">-- ms</span>
         </div>
-        <div id="history"></div>
+        <div class="stat-card">
+            <span class="stat-label">Status</span>
+            <span id="statusIndicator" class="stat-value" style="color: #238636;">Online</span>
+        </div>
     </div>
 
     <script>
-        const API_BASE = "https://latency-8zo5.onrender.com";
-        let lastThumb = "";
-        let myChart = null;
+        // REPLACE THIS with your actual Render URL
+        const API_URL = "https://your-app-name.onrender.com"; 
 
-        // Init User Context
-        const params = new URLSearchParams(window.location.search);
-        const currentUser = params.get('user') || localStorage.getItem('vp_user') || "guest_user";
-        if (params.get('bpm')) document.getElementById('hr-display').innerText = params.get('bpm');
-
-        // --- SEARCH ---
-        document.getElementById('search').addEventListener('keypress', async (e) => {
-            if (e.key === 'Enter') {
-                const query = e.target.value.trim();
-                if (!query) return;
-                document.getElementById('status').innerText = "Syncing with Discogs...";
-                try {
-                    const res = await fetch(`${API_BASE}/search-album?q=${encodeURIComponent(query)}`);
-                    const data = await res.json();
-                    if (data.length > 0) {
-                        e.target.value = data[0].title;
-                        lastThumb = data[0].thumb;
-                        document.getElementById('album-preview').src = lastThumb;
-                        document.getElementById('preview-container').style.display = 'block';
-                        document.getElementById('status').innerText = "Record Ready.";
+        const ctx = document.getElementById('latencyChart').getContext('2d');
+        
+        // Initialize Chart
+        const myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Latency (ms)',
+                    data: [],
+                    borderColor: '#00ffcc',
+                    backgroundColor: 'rgba(0, 255, 204, 0.1)',
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#00ffcc',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false, // Allows chart to stretch to wrapper height
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        ticks: { color: '#8b949e' } 
+                    },
+                    x: { 
+                        grid: { display: false },
+                        ticks: { color: '#8b949e', maxRotation: 0 } 
                     }
-                } catch (err) { document.getElementById('status').innerText = "Search Error."; }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
             }
         });
 
-        // --- LOGGING ---
-        async function logSession() {
-            const albumName = document.getElementById('search').value;
-            if (!albumName) return;
-            const img = document.getElementById('album-preview');
-            const btn = document.getElementById('main-btn');
-
-            img.style.animation = "record-spin 1s linear infinite";
-            btn.innerText = "SPINNING...";
-            btn.disabled = true;
-
-            const payload = {
-                user_email: currentUser,
-                album: albumName,
-                thumb: lastThumb,
-                hr: parseInt(document.getElementById('hr-display').innerText) || 75,
-                rpm: (33.3 + (Math.random() * 0.04 - 0.02)).toFixed(2)
-            };
-
+        // FETCH DATA FROM RENDER
+        async function updateDashboard() {
             try {
-                await fetch(`${API_BASE}/spin`, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify(payload) 
-                });
+                const response = await fetch(`${API_URL}/stats`);
+                if (!response.ok) throw new Error("Network error");
+                
+                const data = await response.json();
 
-                setTimeout(async () => {
-                    img.style.animation = "none";
-                    document.getElementById('preview-container').style.display = "none";
-                    document.getElementById('search').value = "";
-                    document.getElementById('status').innerText = "Pulse Captured!";
-                    btn.disabled = false;
-                    btn.innerText = "LOG PERFORMANCE 🚀";
-                    await loadHistory();
-                }, 1200);
-            } catch (e) {
-                document.getElementById('status').innerText = "Sync Failed.";
-                btn.disabled = false;
+                if (data.length > 0) {
+                    // Update the text display
+                    const latest = data[data.length - 1];
+                    document.getElementById('currentPing').innerText = `${latest.ping_ms} ms`;
+
+                    // Update the chart
+                    myChart.data.labels = data.map(entry => {
+                        const date = new Date(entry.created_at);
+                        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    });
+                    myChart.data.datasets[0].data = data.map(entry => entry.ping_ms);
+                    
+                    myChart.update('none'); // Update without flickering
+                }
+            } catch (err) {
+                console.error("Dashboard Sync Failed:", err);
+                document.getElementById('statusIndicator').innerText = "Offline";
+                document.getElementById('statusIndicator').style.color = "#da3633";
             }
         }
 
-        // --- DATA SYNC ---
-        async function loadHistory() {
-            try {
-                const res = await fetch(`${API_BASE}/data?user=${encodeURIComponent(currentUser)}&_t=${Date.now()}`);
-                const rawRows = await res.json();
-                
-                // CRITICAL FIX: Ensure values are Numbers for the Chart
-                const cleanData = rawRows.map(row => {
-                    const content = row.data ? row.data : row; 
-                    return {
-                        album: content.album || "Unknown",
-                        thumb: content.thumb || "",
-                        hr: Number(content.hr) || 70, 
-                        rpm: Number(content.rpm) || 33.3
-                    };
-                });
-
-                document.getElementById('total-count').innerText = cleanData.length;
-                
-                const historyDiv = document.getElementById('history');
-                if (cleanData.length === 0) {
-                    historyDiv.innerHTML = "<p style='color:#444; text-align:center;'>No sessions found.</p>";
-                    updateChart([]);
-                    return;
-                }
-
-                historyDiv.innerHTML = cleanData.map(d => `
-                    <div class="log">
-                        <img class="log-img" src="${d.thumb}" onerror="this.src='https://via.placeholder.com/45?text=💿'">
-                        <div style="flex:1"><strong>${d.album}</strong><br><span style="color:var(--primary)">${d.hr} BPM</span> | <span style="color:var(--latency)">${d.rpm} RPM</span></div>
-                    </div>`).join('');
-
-                updateChart(cleanData.slice(0, 10).reverse());
-            } catch (e) { console.error("History fail:", e); }
-        }
-
-        // --- CHART SYNC ---
-        function updateChart(points) {
-            const ctx = document.getElementById('pulseChart').getContext('2d');
-            if (myChart) myChart.destroy();
-            
-            myChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: points.map((_, i) => i + 1),
-                    datasets: [
-                        { 
-                            label: 'BPM', 
-                            data: points.map(p => p.hr), 
-                            borderColor: '#00ffcc', 
-                            tension: 0.4, 
-                            fill: true, 
-                            backgroundColor: 'rgba(0,255,204,0.05)', 
-                            yAxisID: 'y' 
-                        },
-                        { 
-                            label: 'RPM', 
-                            data: points.map(p => p.rpm), 
-                            borderColor: '#ff0077', 
-                            yAxisID: 'y1', 
-                            pointRadius: 3, 
-                            pointBackgroundColor: '#ff0077' 
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    animation: { duration: 1000 },
-                    scales: { 
-                        y: { suggestedMin: 50, suggestedMax: 150, ticks: { color: '#00ffcc', font: { size: 9 } }, grid: { color: '#222' } }, 
-                        y1: { position: 'right', suggestedMin: 33.1, suggestedMax: 33.5, ticks: { color: '#ff0077', font: { size: 9 } }, grid: { display: false } }, 
-                        x: { display: false } 
-                    },
-                    plugins: { legend: { display: false } }
-                }
-            });
-        }
-        window.onload = loadHistory;
+        // Auto-refresh every 5 seconds
+        setInterval(updateDashboard, 5000);
+        updateDashboard();
     </script>
 </body>
+</html>
 </html>
