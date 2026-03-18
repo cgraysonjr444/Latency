@@ -7,126 +7,124 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --bg-color: #0d1117;
-            --card-bg: #161b22;
+            --bg: #0d1117;
+            --card: #161b22;
             --accent: #00ffcc;
+            --border: #30363d;
             --text: #c9d1d9;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
+            background-color: var(--bg);
             color: var(--text);
+            font-family: -apple-system, sans-serif;
             margin: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-height: 100vh;
-        }
-
-        header {
-            margin: 40px 0;
-            text-align: center;
-        }
-
-        h1 { color: var(--accent); margin: 0; font-size: 2rem; }
-        p { opacity: 0.8; }
-
-        /* THE CRITICAL CHART FIX: Fixed height prevents collapse */
-        #chartWrapper {
-            position: relative;
-            height: 350px; 
-            width: 90%;
-            max-width: 800px;
-            background: var(--card-bg);
-            border: 1px solid #30363d;
-            border-radius: 12px;
             padding: 20px;
+        }
+
+        h1 { color: var(--accent); margin-bottom: 5px; }
+        .subtitle { opacity: 0.6; margin-bottom: 30px; font-size: 0.9rem; }
+
+        /* THE VISIBILITY FIX: Fixed height prevents Chart.js from collapsing to 0px */
+        #chart-wrapper {
+            position: relative;
+            height: 400px;
+            width: 95vw;
+            max-width: 900px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 15px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        .stats-row {
+            display: flex;
             gap: 20px;
-            width: 90%;
-            max-width: 800px;
-            margin-top: 30px;
+            margin-top: 20px;
+            width: 95vw;
+            max-width: 900px;
         }
 
         .stat-card {
-            background: var(--card-bg);
-            padding: 20px;
+            flex: 1;
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 15px;
             border-radius: 8px;
             text-align: center;
-            border: 1px solid #30363d;
         }
 
         .stat-value {
+            display: block;
             font-size: 1.5rem;
             font-weight: bold;
             color: var(--accent);
-            display: block;
         }
+
+        .stat-label { font-size: 0.8rem; opacity: 0.7; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>System Latency Monitor</h1>
-        <p>Live performance tracking for cgraysonjr444.github.io</p>
-    </header>
+    <h1>System Latency Pulse</h1>
+    <div class="subtitle">Real-time Performance Monitoring</div>
 
-    <div id="chartWrapper">
+    <div id="chart-wrapper">
         <canvas id="latencyChart"></canvas>
     </div>
 
-    <div class="stats-grid">
+    <div class="stats-row">
         <div class="stat-card">
-            <span class="stat-label">Current Ping</span>
-            <span id="currentPing" class="stat-value">-- ms</span>
+            <span class="stat-label">Current Latency</span>
+            <span id="current-ping" class="stat-value">-- ms</span>
         </div>
         <div class="stat-card">
-            <span class="stat-label">Status</span>
-            <span id="statusIndicator" class="stat-value" style="color: #238636;">Online</span>
+            <span class="stat-label">Server Status</span>
+            <span id="server-status" class="stat-value" style="color: #8b949e;">Connecting...</span>
         </div>
     </div>
 
     <script>
-        // REPLACE THIS with your actual Render URL
-        const API_URL = "https://your-app-name.onrender.com"; 
+        // 1. UPDATE THIS to your actual Render Web Service URL
+        const API_URL = "https://your-service-name.onrender.com"; 
 
         const ctx = document.getElementById('latencyChart').getContext('2d');
-        
-        // Initialize Chart
+        const pingDisplay = document.getElementById('current-ping');
+        const statusDisplay = document.getElementById('server-status');
+
+        // 2. INITIALIZE CHART
         const myChart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: [],
                 datasets: [{
-                    label: 'Latency (ms)',
+                    label: 'Latency',
                     data: [],
                     borderColor: '#00ffcc',
                     backgroundColor: 'rgba(0, 255, 204, 0.1)',
                     borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
                     pointRadius: 4,
-                    pointBackgroundColor: '#00ffcc',
-                    tension: 0.3,
-                    fill: true
+                    pointBackgroundColor: '#00ffcc'
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false, // Allows chart to stretch to wrapper height
+                maintainAspectRatio: false, // Essential for fixed-height container
                 scales: {
                     y: { 
                         beginAtZero: true, 
-                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        grid: { color: 'rgba(255,255,255,0.05)' },
                         ticks: { color: '#8b949e' } 
                     },
                     x: { 
                         grid: { display: false },
-                        ticks: { color: '#8b949e', maxRotation: 0 } 
+                        ticks: { color: '#8b949e' } 
                     }
                 },
                 plugins: {
@@ -135,39 +133,41 @@
             }
         });
 
-        // FETCH DATA FROM RENDER
-        async function updateDashboard() {
+        // 3. FETCH AND SYNC DATA
+        async function fetchData() {
             try {
-                const response = await fetch(`${API_URL}/stats`);
-                if (!response.ok) throw new Error("Network error");
+                const res = await fetch(`${API_URL}/stats`);
+                if (!res.ok) throw new Error("Offline");
                 
-                const data = await response.json();
+                const data = await res.json();
 
                 if (data.length > 0) {
-                    // Update the text display
                     const latest = data[data.length - 1];
-                    document.getElementById('currentPing').innerText = `${latest.ping_ms} ms`;
+                    
+                    // Update Text Stats
+                    pingDisplay.innerText = `${latest.ping_ms} ms`;
+                    statusDisplay.innerText = "Online";
+                    statusDisplay.style.color = "#238636";
 
-                    // Update the chart
-                    myChart.data.labels = data.map(entry => {
-                        const date = new Date(entry.created_at);
-                        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    // Update Chart Data
+                    myChart.data.labels = data.map(d => {
+                        const time = new Date(d.created_at);
+                        return time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                     });
-                    myChart.data.datasets[0].data = data.map(entry => entry.ping_ms);
+                    myChart.data.datasets[0].data = data.map(d => d.ping_ms);
                     
                     myChart.update('none'); // Update without flickering
                 }
             } catch (err) {
-                console.error("Dashboard Sync Failed:", err);
-                document.getElementById('statusIndicator').innerText = "Offline";
-                document.getElementById('statusIndicator').style.color = "#da3633";
+                console.error("Fetch failed:", err);
+                statusDisplay.innerText = "Offline";
+                statusDisplay.style.color = "#da3633";
             }
         }
 
         // Auto-refresh every 5 seconds
-        setInterval(updateDashboard, 5000);
-        updateDashboard();
+        setInterval(fetchData, 5000);
+        fetchData();
     </script>
 </body>
-</html>
 </html>
