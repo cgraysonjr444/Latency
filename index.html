@@ -2,133 +2,57 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Latency Monitor | cgraysonjr444</title>
+    <title>Latency Pulse | cgraysonjr444</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
-        :root { --bg: #0d1117; --card: #161b22; --accent: #00ffcc; --text: #c9d1d9; --err: #f85149; }
-        body { background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; text-align: center; padding: 20px; margin: 0; }
-        
-        /* 2. THE VISIBILITY FIX: Forced 400px height + visible border */
-        #chart-wrapper { 
-            position: relative; 
-            height: 400px; 
-            width: 95%; 
-            max-width: 850px; 
-            margin: 20px auto; 
-            background: var(--card);
-            border: 2px solid #30363d;
-            border-radius: 12px;
-            padding: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        .debug-panel { margin-top: 20px; font-family: monospace; font-size: 0.8rem; }
-        #status-msg { color: var(--accent); }
-        .error-msg { color: var(--err) !important; font-weight: bold; }
-        
-        button { background: var(--card); color: var(--accent); border: 1px solid var(--accent); padding: 8px 16px; border-radius: 6px; cursor: pointer; transition: 0.2s; }
-        button:hover { background: var(--accent); color: var(--bg); }
+        body { background: #0d1117; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
+        #chart-container { height: 400px; width: 90%; max-width: 800px; margin: 20px auto; background: #161b22; border-radius: 8px; padding: 10px; }
+        .status { font-family: monospace; font-size: 14px; margin-bottom: 10px; }
+        #loading { color: #f1e05a; }
     </style>
 </head>
 <body>
-
-    <h1>Latency <span style="color:var(--accent)">Pulse</span> Monitor</h1>
-    
-    <div id="chart-wrapper">
-        <canvas id="latencyChart"></canvas>
-    </div>
-
-    <div class="debug-panel">
-        <div>Server: <span id="status-msg">Initializing...</span></div>
-        <div style="margin-top: 10px;">
-            <button onclick="fetchData()">🔄 Sync Now</button>
-            <button onclick="injectDemoData()" style="border-color: #8b949e; color: #8b949e;">⚡ Demo Mode</button>
-        </div>
-    </div>
+    <h1>Latency Pulse</h1>
+    <div class="status">Server: <span id="server-status">Connecting...</span></div>
+    <div id="chart-container"><canvas id="latencyChart"></canvas></div>
 
     <script>
-        // --- CONFIGURATION ---
-        // REPLACE THIS with your specific Render Web Service URL (Start with https://)
-        const API_URL = "https://your-service-name.onrender.com"; 
-
+        const API_URL = "https://latency-8zo5.onrender.com"; // YOUR LIVE URL
         const ctx = document.getElementById('latencyChart').getContext('2d');
-        const statusEl = document.getElementById('status-msg');
+        const statusEl = document.getElementById('server-status');
 
-        // --- 3. INITIALIZE CHART WITH FALLBACK DATA ---
-        // This ensures the chart draws IMMEDIATELY on page load.
         const myChart = new Chart(ctx, {
             type: 'line',
-            data: {
-                labels: ['System Start'],
-                datasets: [{
-                    label: 'Latency (ms)',
-                    data: [0],
-                    borderColor: '#00ffcc',
-                    backgroundColor: 'rgba(0, 255, 204, 0.1)',
-                    borderWidth: 3,
-                    tension: 0.4,
-                    fill: true,
-                    pointRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false, // Essential for the 400px height fix
-                scales: {
-                    y: { beginAtZero: true, grid: { color: '#30363d' }, ticks: { color: '#8b949e' } },
-                    x: { grid: { display: false }, ticks: { color: '#8b949e' } }
-                },
-                plugins: { legend: { display: false } }
-            }
+            data: { labels: [], datasets: [{ label: 'Latency (ms)', data: [], borderColor: '#00ffcc', tension: 0.4 }] },
+            options: { responsive: true, maintainAspectRatio: false }
         });
 
-        // --- 4. MANUAL DEMO INJECTOR ---
-        function injectDemoData() {
-            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute:'2-digit', second:'2-digit' });
-            const val = Math.floor(Math.random() * 40) + 15;
-            
-            if (myChart.data.labels.length > 15) { myChart.data.labels.shift(); myChart.data.datasets[0].data.shift(); }
-            myChart.data.labels.push(time);
-            myChart.data.datasets[0].data.push(val);
-            myChart.update();
-            statusEl.innerText = "Running in Demo Mode";
-            statusEl.className = "";
-        }
-
-        // --- 5. REAL DATA SYNC ---
-        async function fetchData() {
+        async function sync() {
             try {
-                statusEl.innerText = "Fetching from Render...";
-                statusEl.className = "";
+                // 1. Wake up/Check Server
+                const check = await fetch(API_URL);
+                if (check.ok) {
+                    statusEl.innerText = "Online 🚀";
+                    statusEl.style.color = "#00ffcc";
+                }
 
-                const response = await fetch(`${API_URL}/stats`);
-                if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+                // 2. Fetch Stats
+                const res = await fetch(`${API_URL}/stats`);
+                const data = await res.json();
                 
-                const data = await response.json();
-
-                if (data && data.length > 0) {
-                    // Update Chart with LIVE data
-                    myChart.data.labels = data.map(d => new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }));
+                if (data.length > 0) {
+                    myChart.data.labels = data.map(d => new Date(d.created_at).toLocaleTimeString());
                     myChart.data.datasets[0].data = data.map(d => d.ping_ms);
                     myChart.update();
-
-                    statusEl.innerText = `Online - Latest: ${data[data.length-1].ping_ms}ms`;
-                } else {
-                    statusEl.innerText = "Connected - Database is Empty";
                 }
             } catch (err) {
-                console.error("Sync Failed:", err);
-                statusEl.innerText = "Offline - Check API URL or CORS";
-                statusEl.className = "error-msg";
+                statusEl.innerText = "Waking up server... (May take 1 min)";
+                statusEl.style.color = "#f1e05a";
             }
         }
 
-        // Auto-refresh every 10 seconds
-        setInterval(fetchData, 10000);
-        
-        // Run first fetch after 1 second to give Render time to breathe
-        setTimeout(fetchData, 1000);
+        setInterval(sync, 5000);
+        sync();
     </script>
 </body>
 </html>
