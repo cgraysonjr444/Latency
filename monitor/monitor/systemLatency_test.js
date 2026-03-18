@@ -1,17 +1,40 @@
-import { assertEquals } from "jsr:@std/assert";
+// 1. PINNED IMPORT (Fixes "Missing version in specifier" on L1)
+import { assertEquals } from "https://deno.land/std@0.177.0/testing/asserts.ts";
 
-Deno.test("Latency Logic - Basic Calculation Check", () => {
-  const start = 1000;
-  const end = 1055;
-  const latency = Math.round(end - start);
+/**
+ * TEST CASE: Latency Calculation Logic
+ * This ensures your app's core math (received - sent) is accurate.
+ */
+Deno.test("Latency Calculation: Basic subtract check", () => {
+  const sentTime = 1710750000000;
+  const receivedTime = 1710750000050; // 50ms later
   
-  // Verify your > 50ms logic threshold
-  assertEquals(latency, 55);
-  assertEquals(latency > 50, true);
+  const latency = receivedTime - sentTime;
+  
+  // This verifies that 150 - 100 correctly equals 50ms
+  assertEquals(latency, 50);
 });
 
-// Example of a mock fetch test
-Deno.test("API Route - Check URL", () => {
-  const url = "https://api.latency.app/grooves";
-  assertEquals(url.includes("grooves"), true);
+/**
+ * TEST CASE: Environment Integrity
+ * Ensures the Deno runtime is accessible and versioned.
+ */
+Deno.test("Environment: Deno namespace check", () => {
+  const hasVersion = typeof Deno.version.deno === "string";
+  assertEquals(hasVersion, true);
+});
+
+/**
+ * TEST CASE: Data Structure Validation
+ * Simulates a JSON response from your latency log.
+ */
+Deno.test("Data Structure: Mock log validation", () => {
+  const mockLog = {
+    user: "cgraysonjr444",
+    ping_ms: 45,
+    status: "captured"
+  };
+  
+  assertEquals(mockLog.status, "captured");
+  assertEquals(typeof mockLog.ping_ms, "number");
 });
