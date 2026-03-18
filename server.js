@@ -1,104 +1,110 @@
-import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import postgres from "https://deno.land/x/postgresjs@v3.3.3/mod.js";
 
+// 1. Database Connection (Optimized for Render Free Tier)
 const databaseUrl = Deno.env.get("DATABASE_URL");
-const CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
-const CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
-const REDIRECT_URI = "https://latency-8zo5.onrender.com/auth/callback";
-const DISCOGS_TOKEN = Deno.env.get("DISCOGS_TOKEN") || "";
+const sql = postgres(databaseUrl, { 
+  ssl: "require", 
+  max: 1,
+  idle_timeout: 20,
+  connect_timeout: 30 
+});
 
+// 2. Global CORS Headers
 const headers = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
-  "Cache-Control": "no-store, no-cache, must-revalidate",
-  "X-Server-Source": "VinylPulse-Production"
 };
 
-async function runQuery(query, params = []) {
-  if (!databaseUrl) throw new Error("DATABASE_URL missing");
-  const client = new Client(databaseUrl);
-  try {
-    await client.connect();
-    const result = await client.queryObject(query, ...params);
-    return result.rows;
-  } finally {
-    try { await client.end(); } catch (_e) { /* ignore */ }
-  }
-}
+console.log("Vinyl Pulse API is starting up...");
 
-Deno.serve({ port: 10000 }, async (req) => {
+serve(async (req) => {
   const url = new URL(req.url);
-  const path = url.pathname.toLowerCase().replace(/\/$/, "");
+  const path = url.pathname;
 
-  if (req.method === "OPTIONS") return new Response(null, { headers });
+  // Handle Browser CORS Pre-flight
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers });
+  }
 
   try {
-    if (path === "" || path === "/") {
-      const html = await Deno.readTextFile("./index.html");
-      return new Response(html, { headers: { ...headers, "Content-Type": "text/html" } });
-    }
-
-    if (path.includes("auth/google")) {
-      const scopes = ["https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/fitness.heart_rate.read"].join(" ");
-      return Response.redirect(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=${scopes}&access_type=offline&prompt=consent`, 302);
-    }
-
-    if (path.includes("auth/callback")) {
-      const code = url.searchParams.get("code") || "";
-      const tRes = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ code, client_id: CLIENT_ID, client_secret: CLIENT_SECRET, redirect_uri: REDIRECT_URI, grant_type: "authorization_code" })
-      });
-      const tokens = await tRes.json();
-      const AT = tokens.access_token;
-
-      const uRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", { headers: { Authorization: `Bearer ${AT}` } });
-      const user = await uRes.json();
-
-      let bpm = 72; 
-      try {
-        const fitRes = await fetch("https://www.googleapis.com/fitness/v1/users/me/datasetAggregate", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${AT}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            aggregateBy: [{ dataSourceId: "derived:com.google.heart_rate.bpm:com.google.android.gms:merge_heart_rate_bpm" }],
-            bucketByTime: { durationMillis: 300000 },
-            startTimeMillis: Date.now() - 300000,
-            endTimeMillis: Date.now()
-          })
-        });
-        const fitData = await fitRes.json();
-        bpm = Math.round(fitData.bucket[0].dataset[0].point[0].value[0].fpVal);
-      } catch (_e) { console.log("Fit data empty"); }
-
-      return Response.redirect(`/?auth=success&user=${encodeURIComponent(user.email)}&bpm=${bpm}`, 302);
-    }
-
-    if (path === "/search-album") {
-      const q = url.searchParams.get("q") || "";
-      const dRes = await fetch(`https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release&per_page=5`, {
-        headers: { "Authorization": `Discogs token=${DISCOGS_TOKEN}`, "User-Agent": "VinylPulse/1.2" }
-      });
-      const dData = await dRes.json();
-      return new Response(JSON.stringify(dData.results || []), { headers: { ...headers, "Content-Type": "application/json" } });
-    }
-
+    // --- ROUTE: SAVE A SPIN (POST) ---
     if (path === "/spin" && req.method === "POST") {
       const body = await req.json();
-      await runQuery("CREATE TABLE IF NOT EXISTS spins (id SERIAL PRIMARY KEY, data JSONB, created_at TIMESTAMPTZ DEFAULT NOW())");
-      const res = await runQuery("INSERT INTO spins (data) VALUES ($1) RETURNING *", [body]);
-      return new Response(JSON.stringify(res[0]), { headers: { ...headers, "Content-Type": "application/json" } });
+      
+      // Safety: Ensure the table exists
+      await sql`
+        CREATE TABLE IF NOT EXISTS spins (
+          id SERIAL PRIMARY KEY, 
+          user_email TEXT,
+          data JSONB, 
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )`;
+
+      // Insert the data into Postgres
+      const result = await sql`
+        INSERT INTO spins (user_email, data) 
+        VALUES (${body.user_email || 'guest_user'}, ${sql.json(body)}) 
+        RETURNING *`;
+
+      return new Response(JSON.stringify({ success: true, entry: result[0] }), {
+        headers: { ...headers, "Content-Type": "application/json" },
+      });
     }
 
-    if (path === "/data") {
+    // --- ROUTE: GET HISTORY (GET) ---
+    if (path === "/data" && req.method === "GET") {
       const user = url.searchParams.get("user") || "guest_user";
-      const rows = await runQuery("SELECT * FROM spins WHERE data->>'user_email' = $1 ORDER BY created_at DESC LIMIT 20", [user]);
-      return new Response(JSON.stringify(rows), { headers: { ...headers, "Content-Type": "application/json" } });
+      
+      // Fetch the last 20 spins for this specific user
+      const rows = await sql`
+        SELECT data FROM spins 
+        WHERE user_email = ${user} 
+        ORDER BY created_at DESC 
+        LIMIT 20`;
+
+      return new Response(JSON.stringify(rows), {
+        headers: { 
+          ...headers, 
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache" // Ensures the browser always gets fresh data
+        },
+      });
     }
 
-    return new Response("Not Found", { status: 404, headers });
+    // --- ROUTE: DISCOGS SEARCH (GET) ---
+    if (path === "/search-album" && req.method === "GET") {
+      const query = url.searchParams.get("q");
+      const token = Deno.env.get("DISCOGS_TOKEN");
+
+      const discogsRes = await fetch(
+        `https://api.discogs.com/database/search?q=${encodeURIComponent(query)}&type=release&per_page=1`,
+        { 
+          headers: { 
+            "User-Agent": "VinylPulse/1.0", 
+            "Authorization": `Discogs token=${token}` 
+          } 
+        }
+      );
+
+      const data = await discogsRes.json();
+      return new Response(JSON.stringify(data.results || []), {
+        headers: { ...headers, "Content-Type": "application/json" },
+      });
+    }
+
+    // Health Check / Default Root
+    return new Response("Vinyl Pulse API Online 💿", { 
+      status: 200, 
+      headers 
+    });
+
   } catch (err) {
-    return new Response(JSON.stringify({ error: true, message: err.message }), { status: 200, headers: { ...headers, "Content-Type": "application/json" } });
+    console.error("Critical Server Error:", err.message);
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { ...headers, "Content-Type": "application/json" },
+    });
   }
 });
