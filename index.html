@@ -2,57 +2,153 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Latency Pulse | cgraysonjr444</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
-        body { background: #0d1117; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
-        #chart-container { height: 400px; width: 90%; max-width: 800px; margin: 20px auto; background: #161b22; border-radius: 8px; padding: 10px; }
-        .status { font-family: monospace; font-size: 14px; margin-bottom: 10px; }
-        #loading { color: #f1e05a; }
+        :root { --bg: #0b0e14; --card: #151921; --accent: #00ffcc; --text: #c9d1d9; --vinyl: #1a1a1a; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; margin: 0; }
+        
+        /* VINYL PULSE ANIMATION */
+        .pulse-node {
+            width: 12px; height: 12px; background: var(--accent); border-radius: 50%;
+            display: inline-block; margin-right: 10px; position: relative;
+        }
+        .pulse-node::after {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--accent); border-radius: 50%; animation: pulse-ring 1.5s infinite;
+        }
+        @keyframes pulse-ring { 
+            0% { transform: scale(1); opacity: 0.8; } 
+            100% { transform: scale(3); opacity: 0; } 
+        }
+
+        #chart-container { 
+            height: 350px; width: 95%; max-width: 900px; 
+            margin: 20px auto; background: var(--card); 
+            border: 1px solid #30363d; border-radius: 15px; padding: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+
+        /* MUSIC SEARCH UI */
+        .search-box { margin: 40px auto; max-width: 500px; display: flex; gap: 10px; }
+        input { 
+            flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #30363d; 
+            background: var(--vinyl); color: white; outline: none; 
+        }
+        input:focus { border-color: var(--accent); }
+        button { 
+            padding: 12px 24px; background: var(--accent); color: var(--bg); 
+            border: none; border-radius: 8px; font-weight: bold; cursor: pointer; 
+        }
+
+        #results { 
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); 
+            gap: 20px; max-width: 1000px; margin: 20px auto; padding: 20px; 
+        }
+        .album-card { 
+            background: var(--card); border-radius: 10px; overflow: hidden; 
+            transition: transform 0.2s; border: 1px solid #30363d;
+        }
+        .album-card:hover { transform: translateY(-5px); border-color: var(--accent); }
+        .album-card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
+        .album-card p { font-size: 0.8rem; padding: 10px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     </style>
 </head>
 <body>
-    <h1>Latency Pulse</h1>
-    <div class="status">Server: <span id="server-status">Connecting...</span></div>
-    <div id="chart-container"><canvas id="latencyChart"></canvas></div>
+
+    <header>
+        <h1><span class="pulse-node"></span>Latency <span style="color:var(--accent)">Pulse</span></h1>
+        <p id="status" style="font-family: monospace; opacity: 0.7;">Syncing with Render...</p>
+    </header>
+
+    <div id="chart-container">
+        <canvas id="latencyChart"></canvas>
+    </div>
+
+    <section class="search-section">
+        <div class="search-box">
+            <input type="text" id="albumQuery" placeholder="Search Artist or Album..." onkeypress="if(event.key==='Enter') searchMusic()">
+            <button onclick="searchMusic()">Search Vinyl</button>
+        </div>
+        <div id="results"></div>
+    </section>
 
     <script>
-        const API_URL = "https://latency-8zo5.onrender.com"; // YOUR LIVE URL
+        const API_URL = "https://latency-8zo5.onrender.com"; 
         const ctx = document.getElementById('latencyChart').getContext('2d');
-        const statusEl = document.getElementById('server-status');
+        const statusEl = document.getElementById('status');
 
+        // 1. CHART INITIALIZATION
         const myChart = new Chart(ctx, {
             type: 'line',
-            data: { labels: [], datasets: [{ label: 'Latency (ms)', data: [], borderColor: '#00ffcc', tension: 0.4 }] },
-            options: { responsive: true, maintainAspectRatio: false }
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Response Time (ms)',
+                    data: [],
+                    borderColor: '#00ffcc',
+                    backgroundColor: 'rgba(0, 255, 204, 0.05)',
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: '#00ffcc'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#222' }, ticks: { color: '#888' } },
+                    x: { grid: { display: false }, ticks: { color: '#888' } }
+                },
+                plugins: { legend: { display: false } }
+            }
         });
 
-        async function sync() {
+        // 2. FETCH LATENCY DATA
+        async function updateStats() {
             try {
-                // 1. Wake up/Check Server
-                const check = await fetch(API_URL);
-                if (check.ok) {
-                    statusEl.innerText = "Online 🚀";
-                    statusEl.style.color = "#00ffcc";
-                }
-
-                // 2. Fetch Stats
                 const res = await fetch(`${API_URL}/stats`);
                 const data = await res.json();
                 
                 if (data.length > 0) {
-                    myChart.data.labels = data.map(d => new Date(d.created_at).toLocaleTimeString());
+                    myChart.data.labels = data.map(d => new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }));
                     myChart.data.datasets[0].data = data.map(d => d.ping_ms);
-                    myChart.update();
+                    myChart.update('none');
+                    statusEl.innerText = `Server: Online | Last Ping: ${data[data.length-1].ping_ms}ms`;
                 }
             } catch (err) {
-                statusEl.innerText = "Waking up server... (May take 1 min)";
-                statusEl.style.color = "#f1e05a";
+                statusEl.innerText = "Server: Connecting...";
             }
         }
 
-        setInterval(sync, 5000);
-        sync();
+        // 3. MUSIC SEARCH LOGIC
+        async function searchMusic() {
+            const query = document.getElementById('albumQuery').value;
+            const resultsDiv = document.getElementById('results');
+            if (!query) return;
+
+            resultsDiv.innerHTML = "<p>Searching Discogs...</p>";
+
+            try {
+                const res = await fetch(`${API_URL}/search-album?q=${encodeURIComponent(query)}`);
+                const data = await res.json();
+                
+                resultsDiv.innerHTML = data.results.map(item => `
+                    <div class="album-card">
+                        <img src="${item.cover_image || 'https://via.placeholder.com/150'}" alt="cover">
+                        <p title="${item.title}">${item.title}</p>
+                    </div>
+                `).join('');
+            } catch (err) {
+                resultsDiv.innerHTML = "<p style='color:#ff4444'>Search failed. Check Render logs.</p>";
+            }
+        }
+
+        // Intervals
+        setInterval(updateStats, 5000);
+        updateStats();
     </script>
 </body>
 </html>
