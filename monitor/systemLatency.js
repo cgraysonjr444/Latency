@@ -1,87 +1,73 @@
-// A simple "Heartbeat" monitor for your IT Infrastructure
-// 1. TOOLS: Import the drivers
-import postgres from "https://deno.land/x/postgresjs/mod.js";
-import ping from "npm:ping";
+// 1. PINNED IMPORTS (Required for Deno 2.x / Exit Code 0)
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import postgres from "https://deno.land/x/postgresjs@v3.3.3/mod.js";
 
-// 2. CONNECTION: Initialize the bridge to your database
+// 2. DATABASE CONFIG
 const databaseUrl = Deno.env.get("DATABASE_URL");
+const sql = postgres(databaseUrl, { 
+  ssl: "require", 
+  max: 1,
+  idle_timeout: 20 
+});
 
-if (!databaseUrl) {
-    console.error("❌ Error: DATABASE_URL environment variable is not set.");
-    console.log("Tip: Run with DATABASE_URL=postgres://user:pass@localhost:5432/db");
-    Deno.exit(1);
-}
+// 3. CORS HEADERS (Ensures GitHub Pages can talk to Render)
+const headers = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
 
-// Single persistent connection pool for the life of the script
-const sql = postgres(databaseUrl);
+console.log("Latency Monitor: Online 📡");
 
-/**
- * Persists metrics (Latency, BPM, Workout Time) to PostgreSQL
- */
-async function saveMetric(type, value) {
-    try {
-        await sql`
-            INSERT INTO system_metrics (metric_type, value_ms)
-            VALUES (${type}, ${value})
-        `;
-        console.log(`✅ [DB] Saved ${type}: ${value}`);
-    } catch (err) {
-        console.error(`❌ [DB ERROR] Failed to save ${type}:`, err.message);
+serve(async (req) => {
+  const url = new URL(req.url);
+  
+  // Handle Pre-flight security check
+  if (req.method === "OPTIONS") return new Response(null, { headers });
+
+  try {
+    // --- ROUTE: LOG LATENCY PULSE ---
+    if (url.pathname === "/log" && req.method === "POST") {
+      const body = await req.json();
+      
+      // Safety: Create the latency table if it's missing
+      await sql`
+        CREATE TABLE IF NOT EXISTS latency_logs (
+          id SERIAL PRIMARY KEY,
+          user_email TEXT,
+          ping_ms INTEGER,
+          device_info JSONB,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )`;
+
+      const result = await sql`
+        INSERT INTO latency_logs (user_email, ping_ms, device_info)
+        VALUES (${body.user_email || 'guest'}, ${body.ping_ms}, ${sql.json(body)})
+        RETURNING *`;
+
+      return new Response(JSON.stringify({ status: "captured", data: result[0] }), {
+        headers: { ...headers, "Content-Type": "application/json" }
+      });
     }
-}
 
-/**
- * Main Monitor Logic
- */
-async function checkSystemLatency() {
-    const host = '192.168.1.1'; // Change to your router IP if different
-    
-    try {
-        console.log(`\n--- Report: ${new Date().toLocaleTimeString()} ---`);
-
-        // A. Measure External API Latency
-        const start = performance.now();
-        const response = await fetch("https://api.latency.app/grooves");
+    // --- ROUTE: FETCH STATS ---
+    if (url.pathname === "/stats" && req.method === "GET") {
+      const logs = await sql`
+        SELECT ping_ms, created_at FROM latency_logs 
+        ORDER BY created_at DESC LIMIT 50`;
         
-        if (!response.ok) {
-            throw new Error(`API responded with status: ${response.status}`);
-        }
-        
-        // Finalize fetch to satisfy Deno's resources
-        await response.body?.cancel(); 
-
-        const end = performance.now();
-        const requestLatency = Math.round(end - start);
-        
-        // B. Measure Local Router Ping
-        const pingRes = await ping.promise.probe(host);
-        const routerLatency = Math.round(pingRes.time);
-        
-        console.log(`IT Latency: ${requestLatency}ms | Router: ${routerLatency}ms`);
-        
-        // C. LOGIC BRIDGE: Save to Database
-        await saveMetric('network_lag', requestLatency);
-        await saveMetric('router_ping', routerLatency);
-
-        // Warning trigger for high lag
-        if (requestLatency > 50) {
-            console.warn("⚠️ High Latency Detected! System potentially under load.");
-        }
-
-    } catch (error) {
-        // FAILSAFE: Catch network/API drops without crashing the script
-        console.error("[MONITOR ERROR]: System potentially offline or API unreachable.");
-        console.error(`Details: ${error.message}`);
-        
-        // Log "0" or "offline" status to your metrics table
-        await saveMetric('system_status', 0); 
+      return new Response(JSON.stringify(logs), {
+        headers: { ...headers, "Content-Type": "application/json" }
+      });
     }
-}
 
-// 3. EXECUTION: Run immediately on start
-checkSystemLatency();
+    return new Response("Latency Monitor Active", { headers });
 
-// 4. INTERVAL: Repeat every 60 seconds
-setInterval(checkSystemLatency, 60000);
-
-console.log("🚀 Latency Monitor is active and connected to DB.");
+  } catch (err) {
+    console.error("Monitor Error:", err.message);
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { ...headers, "Content-Type": "application/json" }
+    });
+  }
+});
