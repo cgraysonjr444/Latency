@@ -3,97 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Latency App | cgraysonjr444</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Latency Monitor | cgraysonjr444</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
-        body { background: #0d1117; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
+        :root { --bg: #0d1117; --card: #161b22; --accent: #00ffcc; --text: #c9d1d9; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; text-align: center; padding: 20px; margin: 0; }
         
-        /* THE VISIBILITY FIX: A fixed height prevents the chart from collapsing to 0px */
+        h1 { color: var(--accent); margin-bottom: 5px; }
+        .subtitle { opacity: 0.6; margin-bottom: 25px; font-size: 0.9rem; }
+
+        /* THE VISIBILITY FIX: A fixed height (400px) ensures the canvas never collapses */
         #chart-container { 
             position: relative; 
             height: 400px; 
-            width: 90%; 
-            max-width: 800px; 
+            width: 95%; 
+            max-width: 850px; 
             margin: 20px auto; 
-            background: #161b22;
+            background: var(--card);
             border: 1px solid #30363d;
             border-radius: 12px;
             padding: 15px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.6);
         }
-        
-        #status { font-size: 0.9rem; color: #8b949e; margin-top: 10px; }
-        .accent { color: #00ffcc; font-weight: bold; }
+
+        .controls { margin-top: 20px; display: flex; gap: 10px; justify-content: center; }
+        button { 
+            background: var(--card); 
+            color: var(--accent); 
+            border: 1px solid var(--accent); 
+            padding: 10px 20px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        button:hover { background: var(--accent); color: var(--bg); }
+        #log-status { margin-top: 15px; font-size: 0.8rem; font-family: monospace; color: #8b949e; }
     </style>
 </head>
 <body>
 
-    <h1>System <span class="accent">Latency</span> Monitor</h1>
+    <h1>Latency Pulse Monitor</h1>
+    <div class="subtitle">System performance metrics for cgraysonjr444.github.io</div>
     
     <div id="chart-container">
         <canvas id="latencyChart"></canvas>
     </div>
 
-    <div id="status">Status: Initializing...</div>
+    <div class="controls">
+        <button onclick="fetchData()">🔄 Sync with Server</button>
+        <button onclick="injectDemoPoint()">⚡ Inject Demo Point</button>
+    </div>
+
+    <div id="log-status">Console: Initializing chart...</div>
 
     <script>
-        // 1. UPDATE THIS with your actual Render Web Service URL
+        // 1. UPDATE THIS to your Render URL (must start with https://)
         const API_URL = "https://your-service-name.onrender.com"; 
 
         const ctx = document.getElementById('latencyChart').getContext('2d');
-        const statusEl = document.getElementById('status');
+        const statusLog = document.getElementById('log-status');
 
-        // 2. INITIALIZE CHART WITH DEMO DATA (So it's never blank)
+        // 2. INITIALIZE CHART
         const myChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: ['Demo 1', 'Demo 2', 'Demo 3'],
+                labels: ['Waiting...'],
                 datasets: [{
                     label: 'Latency (ms)',
-                    data: [12, 18, 15],
+                    data: [0],
                     borderColor: '#00ffcc',
                     backgroundColor: 'rgba(0, 255, 204, 0.1)',
                     borderWidth: 3,
                     tension: 0.4,
-                    fill: true
+                    fill: true,
+                    pointRadius: 4
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    y: { beginAtZero: true, grid: { color: '#333' } },
-                    x: { grid: { display: false } }
-                }
+                    y: { beginAtZero: true, grid: { color: '#30363d' }, ticks: { color: '#8b949e' } },
+                    x: { grid: { display: false }, ticks: { color: '#8b949e' } }
+                },
+                plugins: { legend: { display: false } }
             }
         });
 
-        // 3. FETCH DATA AND SWAP DEMO DATA FOR REAL DATA
-        async function updateDashboard() {
+        // 3. DEMO INJECTOR (In case the server is asleep)
+        function injectDemoPoint() {
+            const time = new Date().toLocaleTimeString();
+            const val = Math.floor(Math.random() * 40) + 10;
+            
+            if (myChart.data.labels.length > 10) {
+                myChart.data.labels.shift();
+                myChart.data.datasets[0].data.shift();
+            }
+            myChart.data.labels.push(time);
+            myChart.data.datasets[0].data.push(val);
+            myChart.update();
+            statusLog.innerText = `Console: Injected demo pulse of ${val}ms`;
+        }
+
+        // 4. REAL SYNC LOGIC
+        async function fetchData() {
             try {
+                statusLog.innerText = "Console: Fetching from Render...";
                 const res = await fetch(`${API_URL}/stats`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                
                 const data = await res.json();
 
                 if (data.length > 0) {
-                    // Update Chart with real Database data
-                    myChart.data.labels = data.map(d => new Date(d.created_at).toLocaleTimeString());
+                    myChart.data.labels = data.map(d => new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit', second:'2-digit' }));
                     myChart.data.datasets[0].data = data.map(d => d.ping_ms);
-                    myChart.data.datasets[0].borderColor = '#00ffcc'; // Switch back to green
-                    
-                    statusEl.innerHTML = `Status: <span class="accent">Live</span> | Latest: ${data[data.length-1].ping_ms}ms`;
+                    myChart.update();
+                    statusLog.innerText = `Console: Live sync successful (${data.length} points)`;
                 } else {
-                    statusEl.innerText = "Status: Connected (Database Empty - Showing Demo Mode)";
+                    statusLog.innerText = "Console: Connected, but database is empty.";
                 }
-                myChart.update('none');
             } catch (err) {
-                statusEl.innerHTML = `Status: <span style="color: #ff4444;">Offline</span> (Check Render URL)`;
+                statusLog.innerText = `Console: Error - ${err.message} (Verify API_URL)`;
                 console.error(err);
             }
         }
 
-        // Auto-refresh every 5 seconds
-        setInterval(updateDashboard, 5000);
-        updateDashboard();
+        // Auto-sync every 10 seconds
+        setInterval(fetchData, 10000);
+        fetchData();
     </script>
 </body>
-</html>
 </html>
