@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
 
-# Fixes the Node.js 20 Deprecation Warning notice
+# SILENCE WARNINGS: Forces the runner to use Node 24 (2026 Standard)
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -24,19 +24,23 @@ jobs:
       - name: Setup Deno Environment
         uses: denoland/setup-deno@v2
         with:
+          # Using 'v2.x' ensures you have the latest stable Deno 2 features
           deno-version: v2.x 
+          # Speeds up your build by saving downloaded modules
+          cache: true
+
+      - name: Verify Formatting
+        # 'continue-on-error' means a missing space won't break your build
+        continue-on-error: true
+        run: deno fmt --check
 
       - name: Run Linter
-        # We use 'continue-on-error' so a small typo doesn't kill your demo
-        continue-on-error: true
         run: deno lint
 
       - name: Check Dependencies
-        # Verifies server.js can find all its imports
-        run: deno info server.js
+        # This verifies your 'monitor/systemLatency.js' has valid imports
+        run: deno info monitor/systemLatency.js
 
       - name: Run Tests
-        # Only runs if you have files named something_test.ts
-        continue-on-error: true
-        run: deno test -A
-      #   run: deno test -A --unstable
+        # This specifically runs your latency test file
+        run: deno test -A monitor/monitor/systemLatency_test.js
