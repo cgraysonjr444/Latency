@@ -14,7 +14,7 @@
             text-align: center; padding: 20px; margin: 0; 
         }
 
-        /* VINYL PULSE ICON */
+        /* HEADER PULSE ICON */
         .pulse-node { 
             width: 12px; height: 12px; background: var(--accent); border-radius: 50%;
             display: inline-block; margin-right: 10px; position: relative;
@@ -54,7 +54,7 @@
         }
         button:hover { transform: scale(1.03); background: #00e6b8; }
 
-        /* VINYL GRID & SPIN ANIMATION */
+        /* VINYL GRID */
         #results { 
             display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
             gap: 25px; max-width: 1100px; margin: 0 auto; 
@@ -71,12 +71,12 @@
             transition: border-radius 0.5s, transform 0.5s;
         }
 
-        /* THE SPIN CLASS */
-        .playing img {
+        /* THE SPINNING STATE */
+        .spinning img {
             animation: rotate-vinyl 3s linear infinite;
             border-radius: 50% !important;
-            border: 5px solid #111;
-            box-shadow: 0 0 25px rgba(0, 255, 204, 0.4);
+            border: 6px solid #111;
+            box-shadow: 0 0 25px rgba(0, 255, 204, 0.5);
         }
 
         @keyframes rotate-vinyl {
@@ -84,8 +84,7 @@
             to { transform: rotate(360deg); }
         }
 
-        .album p { font-size: 0.75rem; padding: 12px; margin: 0; font-weight: 500; height: 40px; }
-
+        .album p { font-size: 0.75rem; padding: 12px; margin: 0; font-weight: 500; height: 40px; overflow: hidden; }
         #status-bar { font-family: monospace; font-size: 0.85rem; color: #8b949e; margin-bottom: 15px; }
     </style>
 </head>
@@ -113,7 +112,7 @@
         const ctx = document.getElementById('latencyChart').getContext('2d');
         const statusLog = document.getElementById('status-bar');
 
-        // 1. CHART INITIALIZATION
+        // 1. CHART SETUP
         const myChart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -141,17 +140,67 @@
             }
         });
 
-        // 2. SAFE FETCH WRAPPER
-        async function fetchSafeJSON(endpoint, options = {}) {
+        // 2. LIVE SYNC
+        async function updateStats() {
             try {
-                const response = await fetch(endpoint, options);
-                const contentType = response.headers.get("content-type");
-                if (contentType && contentType.includes("application/json")) {
-                    return await response.json();
+                const res = await fetch(`${API_URL}/stats`);
+                const data = await res.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    myChart.data.labels = data.map(d => new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }));
+                    myChart.data.datasets[0].data = data.map(d => d.ping_ms);
+                    myChart.update('none');
+                    statusLog.innerText = `Engine: Online | Latency: ${data[data.length-1].ping_ms}ms`;
                 }
-                return null;
             } catch (err) {
-                console.error("Fetch error:", err);
-                return null;
+                statusLog.innerText = "System: Syncing with Backend...";
             }
         }
+
+        // 3. SEARCH & PULSE
+        async function searchMusic() {
+            const qInput = document.getElementById('albumQuery');
+            const resDiv = document.getElementById('results');
+            if (!qInput.value) return;
+
+            resDiv.innerHTML = "<p>Scanning crates...</p>";
+
+            try {
+                const res = await fetch(`${API_URL}/search-album?q=${encodeURIComponent(qInput.value)}`);
+                const data = await res.json();
+                
+                if (data && data.results && data.results.length > 0) {
+                    resDiv.innerHTML = data.results.map(item => `
+                        <div class="album" onclick="toggleSpin(this)">
+                            <img src="${item.cover_image || 'https://via.placeholder.com/300'}" alt="vinyl">
+                            <p title="${item.title}">${item.title}</p>
+                        </div>
+                    `).join('');
+                } else {
+                    resDiv.innerHTML = "<p>No vinyl records found.</p>";
+                }
+            } catch (err) {
+                resDiv.innerHTML = "<p style='color:red'>Search Failed. Check DISCOGS_TOKEN.</p>";
+            }
+        }
+
+        // 4. INTERACTIVE CLICK LOGIC
+        function toggleSpin(element) {
+            // Instant Visual Change
+            element.classList.toggle('spinning');
+
+            // Send Interaction "Pulse" to Backend
+            fetch(`${API_URL}/log`, { 
+                method: "POST", 
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ping_ms: 250 }) // Creates a manual spike on chart
+            }).then(() => {
+                // Refresh chart immediately to show the interaction pulse
+                updateStats();
+            });
+        }
+
+        setInterval(updateStats, 5000);
+        updateStats();
+    </script>
+</body>
+</html>
