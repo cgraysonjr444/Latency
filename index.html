@@ -54,18 +54,37 @@
         }
         button:hover { transform: scale(1.03); background: #00e6b8; }
 
-        /* VINYL GRID */
+        /* VINYL GRID & SPIN ANIMATION */
         #results { 
             display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
             gap: 25px; max-width: 1100px; margin: 0 auto; 
         }
         .album { 
             background: var(--card); border-radius: 12px; overflow: hidden; 
-            border: 1px solid #333; transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            border: 1px solid #333; transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            cursor: pointer;
         }
-        .album:hover { transform: translateY(-10px); border-color: var(--accent); box-shadow: 0 10px 20px rgba(0,255,204,0.2); }
-        .album img { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
-        .album p { font-size: 0.75rem; padding: 12px; margin: 0; font-weight: 500; }
+        .album:hover { transform: translateY(-10px); border-color: var(--accent); }
+        
+        .album img { 
+            width: 100%; aspect-ratio: 1/1; object-fit: cover; 
+            transition: border-radius 0.5s, transform 0.5s;
+        }
+
+        /* THE SPIN CLASS */
+        .playing img {
+            animation: rotate-vinyl 3s linear infinite;
+            border-radius: 50% !important;
+            border: 5px solid #111;
+            box-shadow: 0 0 25px rgba(0, 255, 204, 0.4);
+        }
+
+        @keyframes rotate-vinyl {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .album p { font-size: 0.75rem; padding: 12px; margin: 0; font-weight: 500; height: 40px; }
 
         #status-bar { font-family: monospace; font-size: 0.85rem; color: #8b949e; margin-bottom: 15px; }
     </style>
@@ -122,64 +141,17 @@
             }
         });
 
-        // 2. SAFE DATA FETCH (Prevents the JSON Parsing Error)
-        async function fetchSafeJSON(endpoint) {
+        // 2. SAFE FETCH WRAPPER
+        async function fetchSafeJSON(endpoint, options = {}) {
             try {
-                const response = await fetch(endpoint);
+                const response = await fetch(endpoint, options);
                 const contentType = response.headers.get("content-type");
-                
                 if (contentType && contentType.includes("application/json")) {
                     return await response.json();
-                } else {
-                    // Fallback if server sends plain text or HTML error
-                    console.warn("Received non-JSON response from:", endpoint);
-                    return null;
                 }
+                return null;
             } catch (err) {
-                console.error("Fetch failed:", err);
+                console.error("Fetch error:", err);
                 return null;
             }
         }
-
-        // 3. STATS SYNC
-        async function updateStats() {
-            const data = await fetchSafeJSON(`${API_URL}/stats`);
-            
-            if (data && Array.isArray(data) && data.length > 0) {
-                myChart.data.labels = data.map(d => new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }));
-                myChart.data.datasets[0].data = data.map(d => d.ping_ms);
-                myChart.update('none');
-                statusLog.innerText = `Engine: Online | Latest Latency: ${data[data.length-1].ping_ms}ms`;
-            } else {
-                statusLog.innerText = "Engine: Waking up Render server...";
-            }
-        }
-
-        // 4. MUSIC SEARCH LOGIC
-        async function searchMusic() {
-            const queryInput = document.getElementById('albumQuery');
-            const resDiv = document.getElementById('results');
-            if (!queryInput.value) return;
-
-            resDiv.innerHTML = "<p>Scanning the crates...</p>";
-
-            const data = await fetchSafeJSON(`${API_URL}/search-album?q=${encodeURIComponent(queryInput.value)}`);
-            
-            if (data && data.results && data.results.length > 0) {
-                resDiv.innerHTML = data.results.map(item => `
-                    <div class="album">
-                        <img src="${item.cover_image || 'https://via.placeholder.com/300'}" alt="vinyl-cover">
-                        <p title="${item.title}">${item.title}</p>
-                    </div>
-                `).join('');
-            } else {
-                resDiv.innerHTML = `<p style="color:#ffcc00">No results found or server error. Check Render Environment Variables for DISCOGS_TOKEN.</p>`;
-            }
-        }
-
-        // Auto-refresh stats every 5 seconds
-        setInterval(updateStats, 5000);
-        updateStats(); // Initial call
-    </script>
-</body>
-</html>
