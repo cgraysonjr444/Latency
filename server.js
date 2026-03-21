@@ -18,7 +18,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers });
 
   try {
-    // --- ROUTE: MUSIC SEARCH ---
+    // --- ROUTE: SEARCH ---
     if (path.includes("search-album")) {
       const query = url.searchParams.get("q");
       if (!query) return new Response(JSON.stringify({ error: "No query" }), { status: 400, headers });
@@ -28,7 +28,7 @@ serve(async (req) => {
         {
           headers: {
             "Authorization": `Discogs token=${DISCOGS_TOKEN}`,
-            "User-Agent": "VinylPulseApp/1.0" 
+            "User-Agent": "VinylPulse/1.0"
           }
         }
       );
@@ -37,16 +37,18 @@ serve(async (req) => {
       return new Response(JSON.stringify(data), { headers });
     }
 
-    // --- ROUTE: CHART DATA ---
+    // --- ROUTE: STATS ---
     if (path.includes("stats")) {
       const logs = await sql`SELECT ping_ms, created_at FROM latency_logs ORDER BY created_at DESC LIMIT 20`;
       return new Response(JSON.stringify(logs.reverse()), { headers });
     }
 
     // --- FALLBACK (Strict JSON) ---
-    return new Response(JSON.stringify({ status: "Vinyl Pulse Backend Awake 🚀" }), { headers });
+    // This fixed the "unexpected character" error!
+    return new Response(JSON.stringify({ status: "Vinyl Pulse Online 🚀" }), { headers });
 
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
   }
+});
 });
