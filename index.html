@@ -14,7 +14,7 @@
             text-align: center; padding: 20px; margin: 0; 
         }
 
-        /* THE PULSE NODE ANIMATION */
+        /* VINYL PULSE ICON */
         .pulse-node { 
             width: 12px; height: 12px; background: var(--accent); border-radius: 50%;
             display: inline-block; margin-right: 10px; position: relative;
@@ -22,11 +22,11 @@
         .pulse-node::after {
             content: ''; position: absolute; width: 100%; height: 100%;
             top: 0; left: 0; background: var(--accent); border-radius: 50%;
-            animation: ring-pulse 1.5s infinite;
+            animation: ring-pulse 1.8s infinite;
         }
         @keyframes ring-pulse { 
-            0% { transform: scale(1); opacity: 0.6; } 
-            100% { transform: scale(3); opacity: 0; } 
+            0% { transform: scale(1); opacity: 0.8; } 
+            100% { transform: scale(3.5); opacity: 0; } 
         }
 
         #chart-container { 
@@ -37,44 +37,44 @@
         }
 
         /* SEARCH INTERFACE */
-        .search-container { margin-top: 40px; }
+        .search-container { margin-top: 40px; padding-bottom: 50px; }
         .search-bar { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; }
         
         input { 
             padding: 14px; border-radius: 10px; border: 1px solid #30363d; 
-            background: #000; color: white; width: 300px; outline: none;
-            transition: border-color 0.3s;
+            background: #000; color: white; width: 320px; outline: none;
+            font-size: 1rem;
         }
         input:focus { border-color: var(--accent); }
         
         button { 
             padding: 14px 28px; background: var(--accent); color: var(--bg); 
             border: none; border-radius: 10px; font-weight: bold; 
-            cursor: pointer; transition: transform 0.2s;
+            cursor: pointer; transition: 0.2s;
         }
-        button:hover { transform: scale(1.05); background: #00e6b8; }
+        button:hover { transform: scale(1.03); background: #00e6b8; }
 
         /* VINYL GRID */
         #results { 
             display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
-            gap: 25px; max-width: 1100px; margin: 0 auto; padding: 20px; 
+            gap: 25px; max-width: 1100px; margin: 0 auto; 
         }
         .album { 
             background: var(--card); border-radius: 12px; overflow: hidden; 
-            border: 1px solid #333; transition: 0.3s; 
+            border: 1px solid #333; transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
         }
-        .album:hover { transform: translateY(-8px); border-color: var(--accent); }
+        .album:hover { transform: translateY(-10px); border-color: var(--accent); box-shadow: 0 10px 20px rgba(0,255,204,0.2); }
         .album img { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
-        .album p { font-size: 12px; padding: 10px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .album p { font-size: 0.75rem; padding: 12px; margin: 0; font-weight: 500; }
 
-        #status-bar { font-family: monospace; font-size: 0.85rem; color: #8b949e; margin-bottom: 10px; }
+        #status-bar { font-family: monospace; font-size: 0.85rem; color: #8b949e; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
     <header>
         <h1><span class="pulse-node"></span>Vinyl <span style="color:var(--accent)">Pulse</span></h1>
-        <div id="status-bar">Syncing with Render Engine...</div>
+        <div id="status-bar">Syncing with Render engine...</div>
     </header>
 
     <div id="chart-container">
@@ -107,7 +107,7 @@
                     borderWidth: 3,
                     tension: 0.4,
                     fill: true,
-                    pointRadius: 3,
+                    pointRadius: 4,
                     pointBackgroundColor: '#00ffcc'
                 }]
             },
@@ -122,56 +122,64 @@
             }
         });
 
-        // 2. LIVE STATS SYNC
-        async function updateStats() {
+        // 2. SAFE DATA FETCH (Prevents the JSON Parsing Error)
+        async function fetchSafeJSON(endpoint) {
             try {
-                const res = await fetch(`${API_URL}/stats`);
+                const response = await fetch(endpoint);
+                const contentType = response.headers.get("content-type");
                 
-                // Only parse if the server actually sent JSON
-                if (res.headers.get("content-type")?.includes("application/json")) {
-                    const data = await res.json();
-                    if (Array.isArray(data) && data.length > 0) {
-                        myChart.data.labels = data.map(d => new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }));
-                        myChart.data.datasets[0].data = data.map(d => d.ping_ms);
-                        myChart.update('none');
-                        statusLog.innerText = `System Online | Last Ping: ${data[data.length-1].ping_ms}ms`;
-                    }
+                if (contentType && contentType.includes("application/json")) {
+                    return await response.json();
+                } else {
+                    // Fallback if server sends plain text or HTML error
+                    console.warn("Received non-JSON response from:", endpoint);
+                    return null;
                 }
             } catch (err) {
-                statusLog.innerText = "Reconnecting to Render Backend...";
+                console.error("Fetch failed:", err);
+                return null;
             }
         }
 
-        // 3. MUSIC SEARCH LOGIC
+        // 3. STATS SYNC
+        async function updateStats() {
+            const data = await fetchSafeJSON(`${API_URL}/stats`);
+            
+            if (data && Array.isArray(data) && data.length > 0) {
+                myChart.data.labels = data.map(d => new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }));
+                myChart.data.datasets[0].data = data.map(d => d.ping_ms);
+                myChart.update('none');
+                statusLog.innerText = `Engine: Online | Latest Latency: ${data[data.length-1].ping_ms}ms`;
+            } else {
+                statusLog.innerText = "Engine: Waking up Render server...";
+            }
+        }
+
+        // 4. MUSIC SEARCH LOGIC
         async function searchMusic() {
-            const query = document.getElementById('albumQuery').value;
+            const queryInput = document.getElementById('albumQuery');
             const resDiv = document.getElementById('results');
-            if (!query) return;
+            if (!queryInput.value) return;
 
             resDiv.innerHTML = "<p>Scanning the crates...</p>";
 
-            try {
-                const res = await fetch(`${API_URL}/search-album?q=${encodeURIComponent(query)}`);
-                const data = await res.json();
-                
-                if (data.results && data.results.length > 0) {
-                    resDiv.innerHTML = data.results.map(item => `
-                        <div class="album">
-                            <img src="${item.cover_image || 'https://via.placeholder.com/300'}" alt="vinyl-cover">
-                            <p title="${item.title}">${item.title}</p>
-                        </div>
-                    `).join('');
-                } else {
-                    resDiv.innerHTML = "<p>No vinyl records found for that search.</p>";
-                }
-            } catch (err) {
-                resDiv.innerHTML = `<p style="color:#ff4444">Connection Error: Check DISCOGS_TOKEN in Render.</p>`;
+            const data = await fetchSafeJSON(`${API_URL}/search-album?q=${encodeURIComponent(queryInput.value)}`);
+            
+            if (data && data.results && data.results.length > 0) {
+                resDiv.innerHTML = data.results.map(item => `
+                    <div class="album">
+                        <img src="${item.cover_image || 'https://via.placeholder.com/300'}" alt="vinyl-cover">
+                        <p title="${item.title}">${item.title}</p>
+                    </div>
+                `).join('');
+            } else {
+                resDiv.innerHTML = `<p style="color:#ffcc00">No results found or server error. Check Render Environment Variables for DISCOGS_TOKEN.</p>`;
             }
         }
 
-        // Run sync every 5 seconds
+        // Auto-refresh stats every 5 seconds
         setInterval(updateStats, 5000);
-        updateStats(); // Run once immediately
+        updateStats(); // Initial call
     </script>
 </body>
 </html>
