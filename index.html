@@ -8,74 +8,39 @@
     <style>
         :root { --bg: #0b0e14; --accent: #00ffcc; --card: #151921; --text: #c9d1d9; }
         
-        body { 
-            background: var(--bg); color: var(--text); 
-            font-family: 'Inter', sans-serif; 
-            text-align: center; padding: 20px; margin: 0; 
-        }
+        body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; text-align: center; padding: 20px; margin: 0; }
 
         /* HEADER PULSE ICON */
-        .pulse-node { 
-            width: 12px; height: 12px; background: var(--accent); border-radius: 50%;
-            display: inline-block; margin-right: 10px; position: relative;
-        }
-        .pulse-node::after {
-            content: ''; position: absolute; width: 100%; height: 100%;
-            top: 0; left: 0; background: var(--accent); border-radius: 50%;
-            animation: ring-pulse 1.8s infinite;
-        }
-        @keyframes ring-pulse { 
-            0% { transform: scale(1); opacity: 0.8; } 
-            100% { transform: scale(3.5); opacity: 0; } 
-        }
+        .pulse-node { width: 12px; height: 12px; background: var(--accent); border-radius: 50%; display: inline-block; margin-right: 10px; position: relative; }
+        .pulse-node::after { content: ''; position: absolute; width: 100%; height: 100%; top: 0; left: 0; background: var(--accent); border-radius: 50%; animation: ring-pulse 1.8s infinite; }
+        @keyframes ring-pulse { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(3.5); opacity: 0; } }
 
         #chart-container { 
             height: 380px; width: 95%; max-width: 900px; 
             margin: 20px auto; background: var(--card); border-radius: 16px; 
-            padding: 20px; border: 1px solid #30363d;
-            box-shadow: 0 10px 50px rgba(0,0,0,0.6);
+            padding: 20px; border: 1px solid #30363d; transition: 0.3s;
         }
 
-        /* SEARCH BAR */
-        .search-container { margin-top: 30px; }
-        input { 
-            padding: 14px; border-radius: 10px; border: 1px solid #30363d; 
-            background: #000; color: white; width: 300px; outline: none;
-        }
-        button { 
-            padding: 14px 28px; background: var(--accent); color: var(--bg); 
-            border: none; border-radius: 10px; font-weight: bold; cursor: pointer;
+        /* FLASH EFFECT FOR INTERACTION */
+        .flash-pulse { animation: pulse-bg 0.7s ease-out; }
+        @keyframes pulse-bg {
+            0% { background-color: rgba(0, 255, 204, 0.4); border-color: var(--accent); }
+            100% { background-color: var(--card); border-color: #30363d; }
         }
 
         /* THE GRID */
-        #results { 
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); 
-            gap: 25px; max-width: 1100px; margin: 40px auto; padding-bottom: 50px;
-        }
-
-        /* THE ALBUM CARD */
-        .album-card { 
-            background: var(--card); border-radius: 12px; border: 1px solid #333; 
-            cursor: pointer; transition: 0.4s; overflow: hidden;
-        }
+        #results { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 25px; max-width: 1100px; margin: 40px auto; padding-bottom: 50px; }
+        .album-card { background: var(--card); border-radius: 12px; border: 1px solid #333; cursor: pointer; transition: 0.4s; overflow: hidden; }
         .album-card:hover { border-color: var(--accent); transform: translateY(-8px); }
-        
-        .album-card img { 
-            width: 100%; aspect-ratio: 1/1; object-fit: cover; 
-            transition: border-radius 0.6s, transform 0.6s; pointer-events: none;
-        }
+        .album-card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; transition: border-radius 0.6s; pointer-events: none; }
 
-        /* THE SPIN STATE (Applied via JavaScript) */
-        .is-spinning img {
-            animation: rotate-vinyl 3s linear infinite;
-            border-radius: 50% !important;
-            border: 6px solid #111;
-            box-shadow: 0 0 25px rgba(0, 255, 204, 0.5);
-        }
-
+        /* SPIN ANIMATION */
+        .is-spinning img { animation: rotate-vinyl 3s linear infinite; border-radius: 50% !important; border: 6px solid #111; box-shadow: 0 0 25px rgba(0, 255, 204, 0.5); }
         @keyframes rotate-vinyl { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         .album-card p { font-size: 11px; padding: 12px; margin: 0; pointer-events: none; height: 35px; overflow: hidden; }
+        input { padding: 14px; border-radius: 10px; border: 1px solid #30363d; background: #000; color: white; width: 300px; outline: none; }
+        button { padding: 14px 28px; background: var(--accent); color: var(--bg); border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
         #status-bar { font-family: monospace; font-size: 0.85rem; color: #8b949e; margin-bottom: 15px; }
     </style>
 </head>
@@ -83,12 +48,10 @@
 
     <header>
         <h1><span class="pulse-node"></span>Vinyl <span style="color:var(--accent)">Pulse</span></h1>
-        <div id="status-bar">Syncing with Render Engine...</div>
+        <div id="status-bar">Syncing with Backend...</div>
     </header>
 
-    <div id="chart-container">
-        <canvas id="latencyChart"></canvas>
-    </div>
+    <div id="chart-container"><canvas id="latencyChart"></canvas></div>
 
     <div class="search-container">
         <input type="text" id="albumQuery" placeholder="Search Artist or Album..." onkeypress="if(event.key==='Enter') searchMusic()">
@@ -102,35 +65,12 @@
         const statusLog = document.getElementById('status-bar');
         const resultsGrid = document.getElementById('results');
 
-        // 1. CHART INITIALIZATION
         const myChart = new Chart(ctx, {
             type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'ms',
-                    data: [],
-                    borderColor: '#00ffcc',
-                    backgroundColor: 'rgba(0, 255, 204, 0.1)',
-                    borderWidth: 3,
-                    tension: 0.4,
-                    fill: true,
-                    pointRadius: 4,
-                    pointBackgroundColor: '#00ffcc'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: true, grid: { color: '#222' } },
-                    x: { grid: { display: false } }
-                },
-                plugins: { legend: { display: false } }
-            }
+            data: { labels: [], datasets: [{ label: 'ms', data: [], borderColor: '#00ffcc', backgroundColor: 'rgba(0, 255, 204, 0.1)', borderWidth: 3, tension: 0.4, fill: true, pointRadius: 4, pointBackgroundColor: '#00ffcc' }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: '#222' } }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } }
         });
 
-        // 2. LIVE DATA SYNC
         async function updateStats() {
             try {
                 const res = await fetch(`${API_URL}/stats`);
@@ -144,48 +84,42 @@
             } catch (err) { statusLog.innerText = "Syncing with Render..."; }
         }
 
-        // 3. MUSIC SEARCH
         async function searchMusic() {
             const query = document.getElementById('albumQuery').value;
             if (!query) return;
             resultsGrid.innerHTML = "<p>Scanning crates...</p>";
-
             try {
                 const res = await fetch(`${API_URL}/search-album?q=${encodeURIComponent(query)}`);
                 const data = await res.json();
-                
-                if (data.results && data.results.length > 0) {
-                    resultsGrid.innerHTML = data.results.map(item => `
-                        <div class="album-card">
-                            <img src="${item.cover_image}" alt="vinyl">
-                            <p>${item.title}</p>
-                        </div>
-                    `).join('');
-                } else {
-                    resultsGrid.innerHTML = "<p>No vinyl records found.</p>";
-                }
-            } catch (err) {
-                resultsGrid.innerHTML = "<p style='color:red'>Check DISCOGS_TOKEN in Render.</p>";
-            }
+                resultsGrid.innerHTML = (data.results || []).map(item => `
+                    <div class="album-card">
+                        <img src="${item.cover_image}" alt="vinyl">
+                        <p>${item.title}</p>
+                    </div>
+                `).join('');
+            } catch (err) { resultsGrid.innerHTML = "<p>Error reaching Discogs.</p>"; }
         }
 
-        // 4. THE "FIX": EVENT DELEGATION
-        // This watches the grid for clicks and identifies the album card
+        // EVENT DELEGATION: THE FLASH + THE PULSE
         resultsGrid.addEventListener('click', (event) => {
             const card = event.target.closest('.album-card');
-            if (!card) return; // Exit if user didn't click an actual album
+            if (!card) return;
 
-            // Toggle the spin animation
+            // 1. Start Spin
             card.classList.toggle('is-spinning');
 
-            // Log a manual pulse (latency spike) to the chart
+            // 2. Flash Background
+            const chartBox = document.getElementById('chart-container');
+            chartBox.classList.remove('flash-pulse');
+            void chartBox.offsetWidth; // Reset animation
+            chartBox.classList.add('flash-pulse');
+
+            // 3. Send 350ms Spike to Data
             fetch(`${API_URL}/log`, { 
                 method: "POST", 
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ping_ms: 300 }) // The manual pulse spike
-            }).then(() => {
-                updateStats(); // Refresh chart instantly to show the spike
-            });
+                body: JSON.stringify({ ping_ms: 350 }) 
+            }).then(() => updateStats());
         });
 
         setInterval(updateStats, 5000);
