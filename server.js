@@ -18,42 +18,42 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers });
 
   try {
+    // --- ROUTE: SEARCH ALBUMS (Discogs) ---
     if (path.includes("search-album")) {
       const query = url.searchParams.get("q");
-      
-      // LOG 1: Check if token exists in environment
-      console.log(`[DEBUG] Token Check: ${DISCOGS_TOKEN ? "Token Present" : "TOKEN MISSING"}`);
+      if (!query) return new Response(JSON.stringify({ error: "No query" }), { status: 400, headers });
 
       const discogsRes = await fetch(
         `https://api.discogs.com/database/search?q=${encodeURIComponent(query)}&type=release&per_page=6`,
         {
           headers: {
             "Authorization": `Discogs token=${DISCOGS_TOKEN}`,
-            "User-Agent": "VinylPulseApp/1.0 (cgraysonjr444)" 
+            "User-Agent": "VinylPulseApp/1.0"
           }
         }
       );
-
-      // LOG 2: Check Discogs response status
-      if (!discogsRes.ok) {
-        const errorText = await discogsRes.text();
-        console.error(`[DEBUG] Discogs API Rejected: ${discogsRes.status} - ${errorText}`);
-        return new Response(JSON.stringify({ error: "Discogs Rejected", status: discogsRes.status }), { status: discogsRes.status, headers });
-      }
 
       const data = await discogsRes.json();
       return new Response(JSON.stringify(data), { headers });
     }
 
+    // --- ROUTE: LOG A PULSE (POST) ---
+    if (path.includes("log") && req.method === "POST") {
+      const body = await req.json();
+      const ping = Number(body.ping_ms) || 100;
+      await sql`INSERT INTO latency_logs (ping_ms) VALUES (${ping})`;
+      return new Response(JSON.stringify({ status: "Pulse Logged", value: ping }), { headers });
+    }
+
+    // --- ROUTE: GET STATS (Chart Data) ---
     if (path.includes("stats")) {
       const logs = await sql`SELECT ping_ms, created_at FROM latency_logs ORDER BY created_at DESC LIMIT 20`;
       return new Response(JSON.stringify(logs.reverse()), { headers });
     }
 
-    return new Response(JSON.stringify({ status: "Ready" }), { headers });
+    return new Response(JSON.stringify({ status: "Vinyl Pulse Backend Online" }), { headers });
 
   } catch (err) {
-    console.error(`[DEBUG] Server Error: ${err.message}`);
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
   }
 });
